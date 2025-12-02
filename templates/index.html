@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>VoteBot Demo Chat</title>
+    <link rel="stylesheet" href="/static/chat.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="app-header">
+        <div class="app-title">
+          <div>
+            <h1>VoteBot Demo</h1>
+            <p>Create polls, vote, and view results via chat.</p>
+          </div>
+        </div>
+        <div class="app-help">
+          <span>Try:</span>
+          <br />
+          <code>/VoteBot create</code>
+          <br />
+          <code>/VoteBot vote &lt;code&gt;</code>
+          <br />
+          <code>/VoteBot result &lt;code&gt;</code>
+          <br />
+          <code>/VoteBot fetch</code>
+        </div>
+      </header>
+      <main class="chat-shell">
+        <div id="messages" class="messages"></div>
+
+        <section class="chat-footer">
+          <div class="user-row">
+            <label for="user">Name</label>
+            <input id="user" placeholder="Your name" value="Alice" />
+          </div>
+          <div class="input-row" id="inputRow">
+            <input
+              id="msg"
+              placeholder="Type a message… e.g. /VoteBot create"
+            />
+            <button id="send">Send</button>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="/static/chat.js"></script>
+  </body>
+</html>
