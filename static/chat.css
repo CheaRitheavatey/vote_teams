@@ -1,0 +1,170 @@
+:root {
+    --user-bubble: #464EB8;
+    --bot-bubble: lightgray;
+    --border-subtle: #1e293b;
+    --text-main: black;
+    --text-muted: #9ca3af;
+    --danger: #f97373;
+    --radius-lg: 14px;
+    --radius-md: 999px;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: stretch;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color: var(--text-main);
+}
+
+.app-help {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-main);
+}
+
+.app-help code {
+    background: lightgray;
+    border-radius: 999px;
+    padding: 4px 8px;
+    border: 1px solid rgba(148, 163, 184, 0.4);
+    color: var(--accent);
+}
+
+.chat-shell {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 8px 12px 12px;
+    gap: 10px;
+}
+
+.messages {
+    flex: 1;
+    padding: 10px 16px;
+    border-radius: 14px;
+    overflow-y: auto;
+}
+
+.msg-row {
+    display: flex;
+    margin: 10px 0;
+}
+
+.msg-row.user {
+    justify-content: flex-end;
+}
+
+.msg-row.bot {
+    justify-content: flex-start;
+}
+
+.msg {
+    max-width: 70%;
+    padding: 10px 14px;
+    border-radius: 14px;
+    font-size: 14px;
+    line-height: 1.4;
+    position: relative;
+    white-space: pre-wrap;
+}
+
+.msg.user {
+    background: #464EB8;
+    color: #ffffff;
+    border-bottom-right-radius: 3px;
+    margin-left: 40px;
+    margin-bottom: 20px;
+}
+
+.msg.bot {
+    background: lightgray;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    color: black;
+    border-bottom-left-radius: 3px;
+    margin-right: 40px;
+    margin-bottom: 20px;
+}
+
+.chat-footer {
+    padding-top: 6px;
+    border-top: 1px solid rgba(15, 23, 42, 0.9);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.user-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.user-row label {
+    min-width: 40px;
+}
+
+.user-row input {
+    flex: 1;
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--user-bubble);
+    color: var(--text-main);
+    outline: none;
+}
+
+.user-row input:focus,
+.input-row input:focus {
+    border-color: var(--user-bubble);
+    box-shadow: 0 0 0 1px var(--user-bubble);
+}
+
+.input-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.input-row input {
+    flex: 1;
+    padding: 10px 12px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--user-bubble);
+    color: black;
+    font-size: 14px;
+    outline: none;
+}
+
+.input-row input::placeholder {
+    color: rgba(148, 163, 184, 0.7);
+}
+
+.input-row button {
+    padding: 9px 18px;
+    border-radius: var(--radius-md);
+    border: none;
+    background: var(--user-bubble);
+    color: white;
+    font-weight: 600;
+    font-size: 14px;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.08s ease;
+}
+
+.input-row button:hover {
+    filter: brightness(1.05);
+    box-shadow: 0 0 18px #5059C9;
+}
+
+.input-row button:active {
+    transform: translateY(1px);
+    box-shadow: 0 0 18px #5059C9;
+}
