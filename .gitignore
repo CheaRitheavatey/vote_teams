@@ -1,1 +1,9 @@
 .env*
+__pycache__\.idea/
+.vscode/
+__pycache__/
+dist/
+.coverage*
+htmlcov/
+.tox/
+docs/_build/
