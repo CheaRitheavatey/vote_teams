@@ -4,11 +4,15 @@ from api.fetch_question import fetch_question, fetch_surveys
 from api.submit_answer import submit_answer
 from api.create_survey import create_survey
 from api.get_result import get_survey_results
+from api.validation import SurveyValidator
 
 import uuid
 
 
 app = Flask(__name__)
+
+# Initialize validator instance for email validation
+validator = SurveyValidator()
 
 # maps room_id -> state dict
 ROOMS = {
@@ -38,8 +42,8 @@ def api_message():
     # Simple command parsing:
     if text.lower().startswith("/votebot create"):
         # start interactive create flow
-        ROOMS[room]["pending_create"] = {"step": "ask_title", "temp": {}}
-        bot_text = "Sure — what's the survey title?"
+        ROOMS[room]["pending_create"] = {"step": "ask_email", "temp": {}}
+        bot_text = "Sure — first, what's your email address? (Required for survey creation)"
         messages.append({"from": "VoteBot", "text": bot_text})
         return jsonify(messages=messages)
 
@@ -48,11 +52,24 @@ def api_message():
     if state:
         step = state["step"]
 
+        # Ask email (new first step)
+        if step == "ask_email":
+            # TODO: Implement proper email validation after consulting with mentor
+            # Basic format check only for now
+            if "@" not in text or "." not in text:
+                messages.append({"from": "VoteBot", "text": "Please enter a valid email address (must contain @ and a domain)."})
+                return jsonify(messages=messages)
+            
+            state["temp"]["email"] = text.strip()
+            state["step"] = "ask_title"
+            messages.append({"from": "VoteBot", "text": "Great! Now, what's the survey title?"})
+            return jsonify(messages=messages)
+
         # Ask title
         if step == "ask_title":
             state["temp"]["title"] = text
             state["step"] = "ask_question"
-            messages.append({"from": "VoteBot", "text": "Great. What's the question?"})
+            messages.append({"from": "VoteBot", "text": "What's the question?"})
             return jsonify(messages=messages)
 
         # Ask question
@@ -77,11 +94,13 @@ def api_message():
 
             title = state["temp"]["title"]
             question = state["temp"]["question"]
+            email = state["temp"]["email"]
             qtype = "Single Choice" if state["temp"]["qtype"] == "ChoiceSingle" else "Multiple Choice"
             options_text = "\n".join([f"- {o}" for o in opts])
 
             overview = (
                 "Here is your survey overview:\n\n"
+                f"**Creator Email:** {email}\n"
                 f"**Title:** {title}\n"
                 f"**Question:** {question}\n"
                 f"**Type:** {qtype}\n"
@@ -100,7 +119,7 @@ def api_message():
 
             if cmd == "done":
                 t = state["temp"]
-                response = create_survey(t["title"], t["question"], t["qtype"], t["options"])
+                response = create_survey(t["title"], t["question"], t["qtype"], t["options"], t["email"])
                 enter_code = response.get("enter_code")
 
                 ROOMS[room]["last_survey_code"] = enter_code
@@ -226,11 +245,13 @@ def api_message():
 def send_overview(state):
     title = state["temp"]["title"]
     question = state["temp"]["question"]
+    email = state["temp"]["email"]
     qtype = "Single Choice" if state["temp"]["qtype"] == "ChoiceSingle" else "Multiple Choice"
     options_text = "\n".join([f"- {o}" for o in state["temp"]["options"]])
 
     overview = (
         "Here is your survey overview:\n\n"
+        f"**Creator Email:** {email}\n"
         f"**Title:** {title}\n"
         f"**Question:** {question}\n"
         f"**Type:** {qtype}\n"

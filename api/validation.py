@@ -129,6 +129,157 @@ class SurveyValidator:
         self.rate_limit_delay = rate_limit_delay if rate_limit_delay is not None else RATE_LIMIT_DELAY
         self._last_api_call = 0  # Track last API call time for rate limiting
     
+    # TODO: Ask mentor about proper email validation approach
+    # def validate_email(self, email: str) -> ValidationResult:
+    #     """
+    #     Validates email by attempting to create a minimal test survey with the API.
+    #     This is the only way to verify if the email domain is actually recognized by the system.
+    #     The test survey is created with a distinctive title for easy identification.
+    #     
+    #     Args:
+    #         email: Email address to validate
+    #     
+    #     Returns:
+    #         ValidationResult object with success status and error messages
+    #     """
+    #     errors = []
+    #     warnings = []
+    #     
+    #     # Step 1: Local format validation first
+    #     if not email or not email.strip():
+    #         errors.append("Email address is required")
+    #         return ValidationResult(success=False, errors=errors)
+    #     
+    #     email = email.strip()
+    #     
+    #     # Basic format validation
+    #     if "@" not in email:
+    #         errors.append("Email must contain @ symbol")
+    #     
+    #     if "." not in email:
+    #         errors.append("Email must contain a domain (e.g., .com, .de)")
+    #     
+    #     # Split by @ and validate parts
+    #     parts = email.split("@")
+    #     if len(parts) != 2:
+    #         errors.append("Email must have exactly one @ symbol")
+    #     else:
+    #         local_part, domain_part = parts
+    #         
+    #         if not local_part:
+    #             errors.append("Email must have a username before @")
+    #         
+    #         if not domain_part:
+    #             errors.append("Email must have a domain after @")
+    #         elif "." not in domain_part:
+    #             errors.append("Email domain must contain a period (e.g., example.com)")
+    #         elif domain_part.startswith(".") or domain_part.endswith("."):
+    #             errors.append("Email domain cannot start or end with a period")
+    #         elif ".." in domain_part:
+    #             errors.append("Email domain cannot contain consecutive periods")
+    #     
+    #     # Check for spaces
+    #     if " " in email:
+    #         errors.append("Email cannot contain spaces")
+    #     
+    #     # Check length
+    #     if len(email) > 254:
+    #         errors.append("Email address is too long (maximum 254 characters)")
+    #     
+    #     # If basic format validation fails, return early
+    #     if errors:
+    #         return ValidationResult(success=False, errors=errors, warnings=warnings)
+    #     
+    #     # Step 2: API validation - actually try to create a test survey
+    #     # This is the only reliable way to check if the email is accepted
+    #     try:
+    #         # Apply rate limiting
+    #         if self.rate_limit_delay > 0:
+    #             time_since_last_call = time.time() - self._last_api_call
+    #             if time_since_last_call < self.rate_limit_delay:
+    #                 sleep_time = self.rate_limit_delay - time_since_last_call
+    #                 time.sleep(sleep_time)
+    #         
+    #         # Create minimal test survey with the email
+    #         global_config = self.dummy_gen.get_dummy_global_config()
+    #         global_config["creator"] = email
+    #         global_config["title"] = {"DE": f"[EMAIL_VALIDATION_TEST_{int(time.time())}]"}
+    #         global_config["public"] = False  # Make it private so it doesn't show up publicly
+    #         
+    #         test_payload = {
+    #             "data": {
+    #                 "module": "Survey",
+    #                 "config": {
+    #                     **global_config,
+    #                     "structure": {"start": 0, "components": {"0": {"default": -1}}}
+    #                 },
+    #                 "question_blocks": {
+    #                     "0": self.dummy_gen.get_dummy_question_block("0", self.language)
+    #                 }
+    #             }
+    #         }
+    #         
+    #         # Actually create the survey to test the email
+    #         response = requests.post(
+    #             f"{BASE_URL}/vote",
+    #             headers=headers,
+    #             json=test_payload,
+    #             timeout=10
+    #         )
+    #         
+    #         self._last_api_call = time.time()
+    #         
+    #         # Check response
+    #         if response.status_code == 200 or response.status_code == 201:
+    #             # Email was accepted! Survey was created successfully
+    #             result_data = response.json()
+    #             warnings.append("Email validated successfully by creating a test survey")
+    #             
+    #             return ValidationResult(
+    #                 success=True,
+    #                 warnings=warnings,
+    #                 data={"email": email, "test_survey": result_data}
+    #             )
+    #         
+    #         elif response.status_code == 422:
+    #             # Validation error - parse the FastAPI error format
+    #             try:
+    #                 error_data = response.json()
+    #                 if "detail" in error_data:
+    #                     if isinstance(error_data["detail"], list):
+    #                         for detail_item in error_data["detail"]:
+    #                             msg = detail_item.get("msg", "Validation error")
+    #                             loc = detail_item.get("loc", [])
+    #                             # Check if error is related to creator/email
+    #                             if "creator" in str(loc):
+    #                                 errors.append(msg)
+    #                             else:
+    #                                 # Other validation error
+    #                                 errors.append(f"Validation error: {msg}")
+    #                     else:
+    #                         errors.append(str(error_data["detail"]))
+    #                 else:
+    #                     errors.append("Email validation failed (status 422)")
+    #             except Exception:
+    #                 errors.append(f"Email validation failed: {response.text[:200]}")
+    #             
+    #             return ValidationResult(success=False, errors=errors, warnings=warnings)
+    #         
+    #         else:
+    #             # Other error status
+    #             error_msg = self._parse_api_error(response)
+    #             errors.append(f"Email validation failed: {error_msg}")
+    #             return ValidationResult(success=False, errors=errors, warnings=warnings)
+    #     
+    #     except requests.exceptions.Timeout:
+    #         errors.append("Email validation timed out. Please try again.")
+    #         return ValidationResult(success=False, errors=errors, warnings=warnings)
+    #     
+    #     except requests.exceptions.RequestException as e:
+    #         errors.append(f"Email validation failed: {str(e)}")
+    #         return ValidationResult(success=False, errors=errors, warnings=warnings)
+    
+    
     def _make_validated_request(self, payload: Dict, timeout: int = 10) -> requests.Response:
         """
         Make a validated API request with rate limiting.

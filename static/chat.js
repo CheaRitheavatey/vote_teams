@@ -1,4 +1,13 @@
 document.getElementById("send").addEventListener("click", send);
+
+// Allow Enter key to send message
+document.getElementById("msg").addEventListener("keypress", function(event) {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    send();
+  }
+});
+
 function send(){
   const user = document.getElementById("user").value || "User";
   const text = document.getElementById("msg").value;
