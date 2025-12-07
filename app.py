@@ -25,6 +25,7 @@ from workflow.advanced_steps import (
 from workflow.quick_mode import (
     handle_quick_mode_selection, handle_quick_email, handle_quick_title,
     handle_quick_question, handle_quick_type, handle_quick_options,
+    handle_quick_rating_min, handle_quick_rating_max,
     handle_quick_confirmation
 )
 from workflow.survey_api import create_advanced_survey
@@ -83,14 +84,27 @@ def api_message():
         if param:
             # Direct vote with code
             enter_code = param.strip()
-            ROOMS[room]["pending_confirmation"] = {"code": enter_code, "block": "0", "question": "0"}
             
             data = fetch_question(enter_code, "0", "0")
             if data:
+                question_type = data.get("question_type", "")
+                ROOMS[room]["pending_confirmation"] = {"code": enter_code, "block": "0", "question": "0", "type": question_type}
+                
                 question_text = data["question"]["DE"]
-                options = [v["DE"] for k, v in data["config"]["options"].items()]
-                options_text = "\n".join([f"{i}. {opt}" for i, opt in enumerate(options)])
-                messages.append({"from": "VoteBot", "text": f"<strong>Question:</strong> {question_text}\n\n{options_text}\n\nEnter your choice (number):"})
+                
+                # Handle different question types
+                if question_type == "RangeSlider":
+                    range_config = data["config"].get("range_config", {})
+                    min_val = range_config.get("min", 0)
+                    max_val = range_config.get("max", 100)
+                    messages.append({"from": "VoteBot", "text": f"<strong>Question:</strong> {question_text}\n\n<strong>Range:</strong> {min_val} to {max_val}\n\nEnter a number between {min_val} and {max_val}:"})
+                elif question_type == "TextQuestion":
+                    messages.append({"from": "VoteBot", "text": f"<strong>Question:</strong> {question_text}\n\nEnter your text answer:"})
+                else:
+                    # ChoiceSingle or ChoiceMulti
+                    options = [v["DE"] for k, v in data["config"]["options"].items()]
+                    options_text = "\n".join([f"{i}. {opt}" for i, opt in enumerate(options)])
+                    messages.append({"from": "VoteBot", "text": f"<strong>Question:</strong> {question_text}\n\n{options_text}\n\nEnter your choice (number):"})
             else:
                 messages.append({"from": "VoteBot", "text": f"Error: Survey code '{enter_code}' not found."})
         else:
@@ -111,14 +125,27 @@ def api_message():
             if 0 <= idx < len(surveys):
                 enter_code = surveys[idx]["enter_code"]
                 ROOMS[room]["pending_vote_for_code"] = None
-                ROOMS[room]["pending_confirmation"] = {"code": enter_code, "block": "0", "question": "0"}
                 
                 data = fetch_question(enter_code, "0", "0")
                 if data:
+                    question_type = data.get("question_type", "")
+                    ROOMS[room]["pending_confirmation"] = {"code": enter_code, "block": "0", "question": "0", "type": question_type}
+                    
                     question_text = data["question"]["DE"]
-                    options = [v["DE"] for k, v in data["config"]["options"].items()]
-                    options_text = "\n".join([f"{i}. {opt}" for i, opt in enumerate(options)])
-                    messages.append({"from": "VoteBot", "text": f"<strong>Question:</strong> {question_text}\n\n{options_text}\n\nEnter your choice (number):"})
+                    
+                    # Handle different question types
+                    if question_type == "RangeSlider":
+                        range_config = data["config"].get("range_config", {})
+                        min_val = range_config.get("min", 0)
+                        max_val = range_config.get("max", 100)
+                        messages.append({"from": "VoteBot", "text": f"<strong>Question:</strong> {question_text}\n\n<strong>Range:</strong> {min_val} to {max_val}\n\nEnter a number between {min_val} and {max_val}:"})
+                    elif question_type == "TextQuestion":
+                        messages.append({"from": "VoteBot", "text": f"<strong>Question:</strong> {question_text}\n\nEnter your text answer:"})
+                    else:
+                        # ChoiceSingle or ChoiceMulti
+                        options = [v["DE"] for k, v in data["config"]["options"].items()]
+                        options_text = "\n".join([f"{i}. {opt}" for i, opt in enumerate(options)])
+                        messages.append({"from": "VoteBot", "text": f"<strong>Question:</strong> {question_text}\n\n{options_text}\n\nEnter your choice (number):"})
                 else:
                     messages.append({"from": "VoteBot", "text": "Error fetching question."})
             else:
@@ -128,18 +155,38 @@ def api_message():
         return jsonify(messages=messages)
 
     if ROOMS[room].get("pending_confirmation"):
-        try:
-            choice = int(text)
-            conf = ROOMS[room]["pending_confirmation"]
-            result = submit_answer(conf["code"], conf["block"], conf["question"], [choice])
+        conf = ROOMS[room]["pending_confirmation"]
+        question_type = conf.get("type", "")
+        
+        if question_type == "TextQuestion":
+            # For TextQuestion, submit the raw text
+            result = submit_answer(conf["code"], conf["block"], conf["question"], [text])
             ROOMS[room]["pending_confirmation"] = None
             
             if result:
-                messages.append({"from": "VoteBot", "text": "✅ Your vote has been submitted!"})
+                messages.append({"from": "VoteBot", "text": "✅ Your answer has been submitted!"})
             else:
-                messages.append({"from": "VoteBot", "text": "❌ Failed to submit vote."})
-        except ValueError:
-            messages.append({"from": "VoteBot", "text": "Please enter a valid number."})
+                messages.append({"from": "VoteBot", "text": "❌ Failed to submit answer."})
+        else:
+            # For RangeSlider and choice questions, parse as number
+            try:
+                if question_type == "RangeSlider":
+                    # For RangeSlider, submit the actual number value as a single-item list
+                    value = int(text)
+                    result = submit_answer(conf["code"], conf["block"], conf["question"], [value])
+                else:
+                    # For choice questions, submit the choice index
+                    choice = int(text)
+                    result = submit_answer(conf["code"], conf["block"], conf["question"], [choice])
+                
+                ROOMS[room]["pending_confirmation"] = None
+                
+                if result:
+                    messages.append({"from": "VoteBot", "text": "✅ Your vote has been submitted!"})
+                else:
+                    messages.append({"from": "VoteBot", "text": "❌ Failed to submit vote."})
+            except ValueError:
+                messages.append({"from": "VoteBot", "text": "Please enter a valid number."})
         return jsonify(messages=messages)
 
     # === RESULTS FLOW ===
@@ -245,6 +292,10 @@ def handle_quick_workflow(step, text, state, messages, room):
         return handle_quick_question(text, state, messages)
     elif step == "ask_type":
         return handle_quick_type(text, state, messages)
+    elif step == "ask_rating_min":
+        return handle_quick_rating_min(text, state, messages)
+    elif step == "ask_rating_max":
+        return handle_quick_rating_max(text, state, messages)
     elif step == "ask_options":
         return handle_quick_options(text, state, messages)
     elif step == "confirm_overview":

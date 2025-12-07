@@ -12,7 +12,7 @@ def send_question_preview(state, validator):
     
     if "options" in q:
         preview += "<strong>Options:</strong>\n" + "\n".join([f"- {opt}" for opt in q["options"]])
-    elif q_type == "Rating" and "rating_min" in q:
+    elif q_type == "RangeSlider" and "rating_min" in q:
         preview += f"<strong>Rating Range:</strong> {q['rating_min']} to {q['rating_max']}"
     
     # Transform question data to API format for validation
@@ -32,10 +32,17 @@ def send_question_preview(state, validator):
             question_data_for_validation["config"]["options"] = options_dict
             question_data_for_validation["config"]["option_type"] = "TEXT"
     
-    elif q_type == "Rating":
+    elif q_type == "RangeSlider":
         if "rating_min" in q and "rating_max" in q:
-            question_data_for_validation["config"]["min"] = q["rating_min"]
-            question_data_for_validation["config"]["max"] = q["rating_max"]
+            min_val = q["rating_min"]
+            max_val = q["rating_max"]
+            question_data_for_validation["config"]["range_config"] = {
+                "min": min_val,
+                "max": max_val,
+                "start": str(min_val),
+                "end": str(max_val),
+                "stepsize": 1
+            }
     
     # Validate the question with proper format
     validation_result = validator.validate_question(question_data_for_validation, q_type)
@@ -57,7 +64,7 @@ def send_question_preview(state, validator):
         
         if q_type in ["ChoiceSingle", "ChoiceMulti"]:
             preview += "• <strong>edit options</strong> - Change the options\n"
-        elif q_type == "Rating":
+        elif q_type == "RangeSlider":
             preview += "• <strong>edit range</strong> - Change the rating range\n"
     
     # Store validation result for later use
