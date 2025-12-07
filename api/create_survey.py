@@ -12,10 +12,17 @@ headers = {
     "x-api-key": API_KEY,
     "Content-Type": "application/json"
 }
-def create_survey():
+def create_survey_interactive():
     print("\n--- Create a New Survey ---")
 
-    # 1. TITLE INPUT
+    # 1. EMAIL INPUT (REQUIRED)
+    while True:
+        email = input("Enter your email (required): ").strip()
+        if "@" in email and "." in email:
+            break
+        print("Please enter a valid email address.")
+
+    # 2. TITLE INPUT
     title = input("Enter survey title: ").strip()
     if not title:
         title = "Untitled Survey"
@@ -69,7 +76,7 @@ def create_survey():
             "module": "Survey",
             "config": {
                 "title": {"DE": title},
-                "creator": "Andreas.Steffl@telekom.de",
+                "creator": email,
                 "public": True,
                 "settings": {
                     "editable_answer": True,
@@ -113,13 +120,13 @@ def create_survey():
     print(response.text)
 
 
-def create_survey(title, question_text, question_type, options):
+def create_survey(title, question_text, question_type, options, creator_email):
     survey_data = {
         "data": {
             "module": "Survey",
             "config": {
                 "title": {"DE": title},
-                "creator": "Andreas.Steffl@telekom.de",
+                "creator": creator_email,
                 "public": True,
                 "settings": {
                     "editable_answer": True,
