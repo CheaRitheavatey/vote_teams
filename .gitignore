@@ -7,3 +7,7 @@ dist/
 htmlcov/
 .tox/
 docs/_build/
+.gitignore
+
+architecture.md
+refactoring_notes.md

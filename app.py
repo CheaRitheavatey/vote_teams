@@ -1,267 +1,303 @@
-# /api/message = POST
+"""
+Vote Teams - Survey Creation Chatbot
+Main Flask application with modular workflow handlers
+"""
 from flask import Flask, render_template, request, jsonify
-from api.fetch_question import fetch_question, fetch_surveys
+from api.fetch_question import fetch_question, fetch_surveys, fetch_survey_list
 from api.submit_answer import submit_answer
-from api.create_survey import create_survey
 from api.get_result import get_survey_results
 from api.validation import SurveyValidator
 
-import uuid
-
+# Import workflow modules
+from workflow.advanced_helpers import send_question_preview, send_advanced_overview
+from workflow.advanced_mode import (
+    handle_advanced_mode_selection, handle_advanced_email,
+    handle_advanced_title, handle_advanced_description,
+    handle_advanced_language
+)
+from workflow.advanced_steps import (
+    handle_block_selection, handle_block_title, handle_block_description,
+    handle_question_type, handle_question_text, handle_question_options,
+    handle_rating_min, handle_rating_max, handle_question_confirm,
+    handle_more_questions_in_block, handle_more_standalone, handle_more_blocks,
+    handle_standalone_after_blocks, handle_advanced_overview
+)
+from workflow.quick_mode import (
+    handle_quick_mode_selection, handle_quick_email, handle_quick_title,
+    handle_quick_question, handle_quick_type, handle_quick_options,
+    handle_quick_confirmation
+)
+from workflow.survey_api import create_advanced_survey
 
 app = Flask(__name__)
 
-# Initialize validator instance for email validation
+# Initialize validator
 validator = SurveyValidator()
 
-# maps room_id -> state dict
+# State management: maps room_id -> state dict
 ROOMS = {
     "demo": {
-        "pending_create": None,   # used when the bot is in create-survey flow
+        "pending_create": None,
         "last_survey_code": None,
         "pending_confirmation": None,
         "pending_vote_for_code": None
     }
 }
 
+
 @app.route("/")
 def index():
     return render_template("index.html")
 
+
 @app.route("/api/message", methods=["POST"])
 def api_message():
+    """Main message handler - routes to appropriate workflow"""
     payload = request.json
     room = "demo"
     user = payload.get("user", "User")
     text = (payload.get("text") or "").strip()
 
-    # append user message for frontend
     messages = []
     messages.append({"from": user, "text": text})
 
-    # Simple command parsing:
-    if text.lower().startswith("/votebot create"):
-        # start interactive create flow
-        ROOMS[room]["pending_create"] = {"step": "ask_email", "temp": {}}
-        bot_text = "Sure — first, what's your email address? (Required for survey creation)"
-        messages.append({"from": "VoteBot", "text": bot_text})
-        return jsonify(messages=messages)
+    if room not in ROOMS:
+        ROOMS[room] = {
+            "pending_create": None,
+            "last_survey_code": None,
+            "pending_confirmation": None,
+            "pending_vote_for_code": None
+        }
 
-    # Continue interactive create flow
     state = ROOMS[room].get("pending_create")
-    if state:
-        step = state["step"]
+    
+    # Parse command with parameters
+    text_lower = text.lower()
+    parts = text_lower.split(maxsplit=1)
+    command = parts[0] if parts else ""
+    param = parts[1] if len(parts) > 1 else None
 
-        # Ask email (new first step)
-        if step == "ask_email":
-            # TODO: Implement proper email validation after consulting with mentor
-            # Basic format check only for now
-            if "@" not in text or "." not in text:
-                messages.append({"from": "VoteBot", "text": "Please enter a valid email address (must contain @ and a domain)."})
-                return jsonify(messages=messages)
+    # === VOTE FLOW ===
+    # Handle "vote" or "vote <code>"
+    if command == "vote":
+        if param:
+            # Direct vote with code
+            enter_code = param.strip()
+            ROOMS[room]["pending_confirmation"] = {"code": enter_code, "block": "0", "question": "0"}
             
-            state["temp"]["email"] = text.strip()
-            state["step"] = "ask_title"
-            messages.append({"from": "VoteBot", "text": "Great! Now, what's the survey title?"})
-            return jsonify(messages=messages)
-
-        # Ask title
-        if step == "ask_title":
-            state["temp"]["title"] = text
-            state["step"] = "ask_question"
-            messages.append({"from": "VoteBot", "text": "What's the question?"})
-            return jsonify(messages=messages)
-
-        # Ask question
-        if step == "ask_question":
-            state["temp"]["question"] = text
-            state["step"] = "ask_type"
-            messages.append({"from": "VoteBot", "text": "Single choice or multiple choice?\nReply 1 for Single / 2 for Multiple."})
-            return jsonify(messages=messages)
-
-        # Ask type
-        if step == "ask_type":
-            state["temp"]["qtype"] = "ChoiceSingle" if text.strip() == "1" else "ChoiceMulti"
-            state["step"] = "ask_options"
-            messages.append({"from": "VoteBot", "text": "Enter options separated by commas (e.g. red,blue,green)."})
-            return jsonify(messages=messages)
-
-        # Ask options → Generate Overview
-        if step == "ask_options":
-            opts = [o.strip() for o in text.split(",") if o.strip()]
-            state["temp"]["options"] = opts
-            state["step"] = "confirm_overview"
-
-            title = state["temp"]["title"]
-            question = state["temp"]["question"]
-            email = state["temp"]["email"]
-            qtype = "Single Choice" if state["temp"]["qtype"] == "ChoiceSingle" else "Multiple Choice"
-            options_text = "\n".join([f"- {o}" for o in opts])
-
-            overview = (
-                "Here is your survey overview:\n\n"
-                f"**Creator Email:** {email}\n"
-                f"**Title:** {title}\n"
-                f"**Question:** {question}\n"
-                f"**Type:** {qtype}\n"
-                f"**Options:**\n{options_text}\n\n"
-                "Type **done** to finalize.\n"
-                "Type **edit title**, **edit question**, **edit type**, or **edit options** to modify.\n"
-                "Type **cancel** to stop."
-            )
-
-            messages.append({"from": "VoteBot", "text": overview})
-            return jsonify(messages=messages)
-        
-        # confirmation phase
-        if step == "confirm_overview":
-            cmd = text.lower()
-
-            if cmd == "done":
-                t = state["temp"]
-                response = create_survey(t["title"], t["question"], t["qtype"], t["options"], t["email"])
-                enter_code = response.get("enter_code")
-
-                ROOMS[room]["last_survey_code"] = enter_code
-                ROOMS[room]["pending_create"] = None
-
-                messages.append({"from": "VoteBot", "text": f"Survey created! Code: {enter_code}. Type /VoteBot vote {enter_code} to do the survey!"})
-                return jsonify(messages=messages)
-
-            if cmd == "edit title":
-                state["step"] = "edit_title"
-                messages.append({"from": "VoteBot", "text": "Enter new title:"})
-                return jsonify(messages=messages)
-
-            if cmd == "edit question":
-                state["step"] = "edit_question"
-                messages.append({"from": "VoteBot", "text": "Enter new question:"})
-                return jsonify(messages=messages)
-
-            if cmd == "edit type":
-                state["step"] = "edit_type"
-                messages.append({"from": "VoteBot", "text": "Reply 1 for Single Choice or 2 for Multiple Choice:"})
-                return jsonify(messages=messages)
-
-            if cmd == "edit options":
-                state["step"] = "edit_options"
-                messages.append({"from": "VoteBot", "text": "Enter new comma-separated options:"})
-                return jsonify(messages=messages)
-
-            if cmd == "cancel":
-                ROOMS[room]["pending_create"] = None
-                messages.append({"from": "VoteBot", "text": "Survey creation cancelled."})
-                return jsonify(messages=messages)
-
-            messages.append({"from": "VoteBot", "text": "Please type done / edit title / edit question / edit type / edit option / cancel."})
-            return jsonify(messages=messages)
-
-        # edit phase
-        if step == "edit_title":
-            state["temp"]["title"] = text
-            state["step"] = "confirm_overview"  
-            messages.append({"from": "VoteBot", "text": send_overview(state)})
-            return jsonify(messages=messages)
-
-        if step == "edit_question":
-            state["temp"]["question"] = text
-            state["step"] = "confirm_overview"
-            messages.append({"from": "VoteBot", "text": send_overview(state)})
-            return jsonify(messages=messages)
-            
-            
-        if step == "edit_type":
-            state["temp"]["qtype"] = "ChoiceSingle" if text.strip() == "1" else "ChoiceMulti"
-            state["step"] = "confirm_overview"
-            
-            messages.append({"from": "VoteBot", "text": send_overview(state)})
-            return jsonify(messages=messages)
-
-        if step == "edit_options":
-            state["temp"]["options"] = [o.strip() for o in text.split(",") if o.strip()]
-            state["step"] = "confirm_overview"
-           
-            messages.append({"from": "VoteBot", "text": send_overview(state)})
-            return jsonify(messages=messages)
-
-    # vote flow
-    if text.lower().startswith("/votebot vote"):
-        parts = text.split()
-        if len(parts) >= 3:
-            code = parts[2]
-            qdata = fetch_question(code, "0", "0")
-            if not qdata:
-                messages.append({"from": "VoteBot", "text": "Could not load survey or invalid code."})
-                return jsonify(messages=messages)
-            question_text = qdata["question"]["DE"]
-            opts = [v["DE"] for k,v in qdata["config"]["options"].items()]
-            # present options to user
-            opt_lines = "\n".join([f"{i}. {o}" for i,o in enumerate(opts)])
-            messages.append({"from": "VoteBot", "text": f"Question: {question_text}\n{opt_lines}\nReply with option number (for multi-choice, send comma-separated numbers)."})
-            # store a simple pending vote marker
-            ROOMS[room]["pending_vote_for_code"] = code
-            return jsonify(messages=messages)
-
-    # handle a vote reply if pending
-    if ROOMS[room].get("pending_vote_for_code"):
-        code = ROOMS[room]["pending_vote_for_code"]
-        # assume reply is numbers e.g. "0" or "0,1"
-        selection = [s.strip() for s in text.split(",") if s.strip()]
-        # call submit_answer - you need a function that matches API expectation
-        resp = submit_answer(code, "0", "0", selection)   # implement in vote_api
-        ROOMS[room]["pending_vote_for_code"] = None
-        if resp.get('identifier'):
-            messages.append({
-                "from": "VoteBot",
-                "text": "Answer submitted!"
-            })
-            return jsonify(messages=messages),200
+            data = fetch_question(enter_code, "0", "0")
+            if data:
+                question_text = data["question"]["DE"]
+                options = [v["DE"] for k, v in data["config"]["options"].items()]
+                options_text = "\n".join([f"{i}. {opt}" for i, opt in enumerate(options)])
+                messages.append({"from": "VoteBot", "text": f"<strong>Question:</strong> {question_text}\n\n{options_text}\n\nEnter your choice (number):"})
+            else:
+                messages.append({"from": "VoteBot", "text": f"Error: Survey code '{enter_code}' not found."})
         else:
-            messages.append({"from": "VoteBot", "text": f"Vote error: {resp}"})
-            return jsonify(messages=messages) ,500
+            # List available surveys
+            available_surveys = fetch_survey_list()
+            if not available_surveys:
+                messages.append({"from": "VoteBot", "text": "No surveys available right now."})
+            else:
+                survey_list = "\n".join([f"{i+1}. {s['title']}" for i, s in enumerate(available_surveys)])
+                ROOMS[room]["pending_vote_for_code"] = available_surveys
+                messages.append({"from": "VoteBot", "text": f"Available surveys:\n{survey_list}\n\nEnter survey number to vote:"})
+        return jsonify(messages=messages)
 
-    # results command
-    if text.lower().startswith("/votebot result"):
-        parts = text.split()
-        code = parts[2] if len(parts) >=3 else ROOMS[room].get("last_survey_code")
-        if not code:
-            messages.append({"from": "VoteBot", "text": "Please provide a survey code: /VoteBot result <code>"})
-            return jsonify(messages=messages)
-        results = get_survey_results(code, block_id=0, question_id=0)  # should return processed dict/string
-        messages.append({"from": "VoteBot", "text": results.replace("\n", "<br>")})
+    if ROOMS[room].get("pending_vote_for_code"):
+        try:
+            idx = int(text) - 1
+            surveys = ROOMS[room]["pending_vote_for_code"]
+            if 0 <= idx < len(surveys):
+                enter_code = surveys[idx]["enter_code"]
+                ROOMS[room]["pending_vote_for_code"] = None
+                ROOMS[room]["pending_confirmation"] = {"code": enter_code, "block": "0", "question": "0"}
+                
+                data = fetch_question(enter_code, "0", "0")
+                if data:
+                    question_text = data["question"]["DE"]
+                    options = [v["DE"] for k, v in data["config"]["options"].items()]
+                    options_text = "\n".join([f"{i}. {opt}" for i, opt in enumerate(options)])
+                    messages.append({"from": "VoteBot", "text": f"<strong>Question:</strong> {question_text}\n\n{options_text}\n\nEnter your choice (number):"})
+                else:
+                    messages.append({"from": "VoteBot", "text": "Error fetching question."})
+            else:
+                messages.append({"from": "VoteBot", "text": "Invalid number."})
+        except ValueError:
+            messages.append({"from": "VoteBot", "text": "Please enter a valid number."})
+        return jsonify(messages=messages)
+
+    if ROOMS[room].get("pending_confirmation"):
+        try:
+            choice = int(text)
+            conf = ROOMS[room]["pending_confirmation"]
+            result = submit_answer(conf["code"], conf["block"], conf["question"], [choice])
+            ROOMS[room]["pending_confirmation"] = None
+            
+            if result:
+                messages.append({"from": "VoteBot", "text": "✅ Your vote has been submitted!"})
+            else:
+                messages.append({"from": "VoteBot", "text": "❌ Failed to submit vote."})
+        except ValueError:
+            messages.append({"from": "VoteBot", "text": "Please enter a valid number."})
+        return jsonify(messages=messages)
+
+    # === RESULTS FLOW ===
+    # Handle "result" or "result <code>"
+    if command == "result":
+        if param:
+            # Get results for specific code
+            survey_code = param.strip()
+            results_data = get_survey_results(survey_code, "0", "0")
+            messages.append({"from": "VoteBot", "text": results_data})
+        else:
+            # Get results for last created survey
+            last_code = ROOMS[room].get("last_survey_code")
+            if last_code:
+                results_data = get_survey_results(last_code, "0", "0")
+                messages.append({"from": "VoteBot", "text": results_data})
+            else:
+                messages.append({"from": "VoteBot", "text": "No survey created yet. Use 'result <code>' to get results for a specific survey."})
         return jsonify(messages=messages)
     
-    
-    # fetch survey 
-    if text.lower().startswith("/votebot fetch"):
-        data = fetch_surveys()
-        messages.append({"from": "VoteBot", "text": data.replace('\n', "<br>")})
+    # === FETCH SURVEYS ===
+    # Handle "fetch" to list all available surveys
+    if command == "fetch":
+        available_surveys = fetch_survey_list()
+        if not available_surveys:
+            messages.append({"from": "VoteBot", "text": "No surveys available right now."})
+        else:
+            survey_list = "\n".join([
+                f"• <strong>{s['title']}</strong> (Code: {s['enter_code']})"
+                for s in available_surveys
+            ])
+            messages.append({"from": "VoteBot", "text": f"<strong>Available Surveys:</strong>\n\n{survey_list}\n\nUse 'vote <code>' to participate."})
         return jsonify(messages=messages)
-    # default
-    messages.append({"from": "VoteBot", "text": "Sorry, I didn't understand. Try '/VoteBot create' or '/VoteBot vote <code>' or '/VoteBot result <code>' or '/VoteBot fetch'."})
+
+    # === CREATE SURVEY FLOW ===
+    if command == "create":
+        ROOMS[room]["pending_create"] = {"step": "ask_mode", "temp": {}}
+        messages.append({"from": "VoteBot", "text": (
+            "<strong>Create a New Survey</strong>\n\n"
+            "Choose mode:\n"
+            "1. <strong>Quick</strong> - Simple survey with one question\n"
+            "2. <strong>Advanced</strong> - Full control with blocks and multiple questions\n\n"
+            "Reply with 1 or 2"
+        )})
+        return jsonify(messages=messages)
+
+    # === SURVEY CREATION WORKFLOW ===
+    if state:
+        step = state.get("step")
+        
+        # Mode selection
+        if step == "ask_mode":
+            if text.strip() == "1":
+                state["temp"]["mode"] = "quick"
+                return handle_quick_mode_selection(state, messages)
+            elif text.strip() == "2":
+                state["temp"]["mode"] = "advanced"
+                return handle_advanced_mode_selection(state, messages)
+            else:
+                messages.append({"from": "VoteBot", "text": "Please reply with 1 for Quick or 2 for Advanced"})
+                return jsonify(messages=messages)
+        
+        # Route to appropriate mode handler
+        mode = state["temp"].get("mode")
+        
+        if mode == "quick":
+            return handle_quick_workflow(step, text, state, messages, room)
+        elif mode == "advanced":
+            return handle_advanced_workflow(step, text, state, messages, room)
+
+    # === DEFAULT ===
+    # Show menu if just "votebot" or unrecognized command
+    if text_lower in ["votebot", "help", "menu", ""]:
+        messages.append({"from": "VoteBot", "text": (
+            "<strong>VoteBot Commands:</strong>\n\n"
+            "• <strong>create</strong> - Create a new survey\n"
+            "• <strong>vote</strong> - List available surveys\n"
+            "• <strong>vote &lt;code&gt;</strong> - Vote in specific survey\n"
+            "• <strong>result</strong> - Results of your last survey\n"
+            "• <strong>result &lt;code&gt;</strong> - Results of specific survey\n"
+            "• <strong>fetch</strong> - List all available surveys\n"
+            "• <strong>help</strong> - Show this menu"
+        )})
+    else:
+        messages.append({"from": "VoteBot", "text": (
+            "Command not recognized. Type <strong>help</strong> to see available commands."
+        )})
     return jsonify(messages=messages)
 
 
-def send_overview(state):
-    title = state["temp"]["title"]
-    question = state["temp"]["question"]
-    email = state["temp"]["email"]
-    qtype = "Single Choice" if state["temp"]["qtype"] == "ChoiceSingle" else "Multiple Choice"
-    options_text = "\n".join([f"- {o}" for o in state["temp"]["options"]])
-
-    overview = (
-        "Here is your survey overview:\n\n"
-        f"**Creator Email:** {email}\n"
-        f"**Title:** {title}\n"
-        f"**Question:** {question}\n"
-        f"**Type:** {qtype}\n"
-        f"**Options:**\n{options_text}\n\n"
-        "Type **done** to finalize.\n"
-        "Type **edit title**, **edit question**, **edit type**, or **edit options** to modify.\n"
-        "Type **cancel** to stop."
+def handle_quick_workflow(step, text, state, messages, room):
+    """Handle quick mode workflow steps"""
+    from workflow.quick_mode import (
+        handle_quick_email, handle_quick_title, handle_quick_question,
+        handle_quick_type, handle_quick_options, handle_quick_confirmation
     )
-    return overview
+    
+    if step == "ask_email":
+        return handle_quick_email(text, state, messages)
+    elif step == "ask_title":
+        return handle_quick_title(text, state, messages)
+    elif step == "ask_question":
+        return handle_quick_question(text, state, messages)
+    elif step == "ask_type":
+        return handle_quick_type(text, state, messages)
+    elif step == "ask_options":
+        return handle_quick_options(text, state, messages)
+    elif step == "confirm_overview":
+        return handle_quick_confirmation(text, state, messages, room, ROOMS)
+    
+    return jsonify(messages=messages)
+
+
+def handle_advanced_workflow(step, text, state, messages, room):
+    """Handle advanced mode workflow steps"""
+    
+    # Global settings steps
+    if step == "ask_email":
+        return handle_advanced_email(text, state, messages, validator)
+    elif step == "advanced_title":
+        return handle_advanced_title(text, state, messages)
+    elif step == "advanced_description":
+        return handle_advanced_description(text, state, messages)
+    elif step == "advanced_language":
+        return handle_advanced_language(text, state, messages, validator)
+    
+    # Block and question creation steps
+    elif step == "advanced_ask_block":
+        return handle_block_selection(text, state, messages)
+    elif step == "block_title":
+        return handle_block_title(text, state, messages)
+    elif step == "block_description":
+        return handle_block_description(text, state, messages)
+    elif step == "select_question_type":
+        return handle_question_type(text, state, messages)
+    elif step == "question_text":
+        return handle_question_text(text, state, messages)
+    elif step == "question_options":
+        return handle_question_options(text, state, messages)
+    elif step == "rating_min":
+        return handle_rating_min(text, state, messages)
+    elif step == "rating_max":
+        return handle_rating_max(text, state, messages)
+    elif step == "question_confirm":
+        return handle_question_confirm(text, state, messages)
+    elif step == "ask_more_questions_in_block":
+        return handle_more_questions_in_block(text, state, messages)
+    elif step == "ask_more_standalone":
+        return handle_more_standalone(text, state, messages)
+    elif step == "ask_more_blocks":
+        return handle_more_blocks(text, state, messages)
+    elif step == "ask_standalone_after_blocks":
+        return handle_standalone_after_blocks(text, state, messages)
+    elif step == "advanced_overview":
+        return handle_advanced_overview(text, state, messages, room)
+    
+    return jsonify(messages=messages)
+
 
 if __name__ == "__main__":
     app.run(debug=True)
-

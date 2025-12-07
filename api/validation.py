@@ -613,14 +613,22 @@ class SurveyValidator:
         for idx, q in enumerate(questions):
             questions_dict[str(idx)] = q
         
-        # Build the block
+        # Build the block with proper structure
+        num_questions = len(questions)
+        components = {}
+        for i in range(num_questions):
+            if i == num_questions - 1:
+                components[str(i)] = {"default": -1}  # Last question points to end
+            else:
+                components[str(i)] = {"default": i + 1}  # Points to next question
+        
         question_block = {
             "0": {
                 "title": block_data.get("title", self.dummy_gen.get_dummy_title(self.language)),
                 "description": block_data.get("description", self.dummy_gen.get_dummy_description(self.language)),
                 "questions": questions_dict,
                 "analysis_mode": "FREE",
-                "structure": block_data.get("structure", {"start": 0, "components": {str(i): {"default": -1} for i in range(len(questions))}})
+                "structure": {"start": 0, "components": components}
             }
         }
         
@@ -649,7 +657,7 @@ class SurveyValidator:
                 # Last block points to -1 (end)
                 structure_components[str(i)] = {"default": -1}
             else:
-                # Each block points to the next
+                # Other blocks point to next block
                 structure_components[str(i)] = {"default": i + 1}
         
         # Merge real config with dummy defaults

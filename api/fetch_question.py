@@ -23,6 +23,23 @@ def fetch_question(enter_code, block_id, question_id):
     return response.json()["data"]
 
 
+# fetch survey list
+def fetch_survey_list():
+    """Returns a list of survey objects"""
+    surveys_list = []
+    response = requests.get(f"{BASE_URL}/vote/", headers=headers)
+    if response.status_code == 200:
+        surveys = response.json()
+        for key, survey in surveys.items():
+            title = (survey.get("title") or {}).get("DE", "No title")
+            enter_code = survey.get("enter_code", "N/A")
+            surveys_list.append({
+                "title": title,
+                "enter_code": enter_code
+            })
+    return surveys_list
+
+
 # fetch survye
 def fetch_surveys():
     data = []
