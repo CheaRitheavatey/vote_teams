@@ -1,6 +1,7 @@
 """
 Advanced survey creation workflow handlers
 """
+import re
 from flask import jsonify
 
 
@@ -13,8 +14,9 @@ def handle_advanced_mode_selection(state, messages):
 
 def handle_advanced_email(text, state, messages, validator):
     """Handle email input for advanced mode"""
-    if "@" not in text or "." not in text:
-        messages.append({"from": "VoteBot", "text": "Please enter a valid email address (must contain @ and a domain)."})
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@telekom\.(com|de)$'
+    if not re.fullmatch(email_pattern, text.strip()):
+        messages.append({"from": "VoteBot", "text": "Please enter a valid email address. Only @telekom.com or @telekom.de domains are allowed."})
         return jsonify(messages=messages)
     
     state["temp"]["email"] = text.strip()

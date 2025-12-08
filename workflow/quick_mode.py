@@ -1,12 +1,13 @@
 """
-Quick survey creation workflow handlers
+Quick mode survey creation workflow
 """
+import re
 from flask import jsonify
 from api.create_survey import create_survey
 
 
 def handle_quick_mode_selection(state, messages):
-    """Handle quick mode selection"""
+    """Initialize quick mode workflow"""
     state["step"] = "ask_email"
     messages.append({"from": "VoteBot", "text": "Let's create your survey!\n\n<strong>Your email?</strong>"})
     return jsonify(messages=messages)
@@ -14,8 +15,9 @@ def handle_quick_mode_selection(state, messages):
 
 def handle_quick_email(text, state, messages):
     """Handle email input for quick mode"""
-    if "@" not in text or "." not in text:
-        messages.append({"from": "VoteBot", "text": "Please enter a valid email address (must contain @ and a domain)."})
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@telekom\.(com|de)$'
+    if not re.fullmatch(email_pattern, text.strip()):
+        messages.append({"from": "VoteBot", "text": "Please enter a valid email address. Only @telekom.com or @telekom.de domains are allowed."})
         return jsonify(messages=messages)
     
     state["temp"]["email"] = text.strip()
@@ -158,7 +160,7 @@ def handle_quick_options(text, state, messages):
         f"<strong>Options:</strong>\n{options_text}\n\n"
         "Type <strong>done</strong> to finalize.\n"
         "Type <strong>edit title</strong>, <strong>edit question</strong>, <strong>edit type</strong>, or <strong>edit options</strong> to modify.\n"
-        "Type <strong>cancel</strong> to stop."
+        "Type <strong>reset</strong> to start over or <strong>cancel</strong> to stop."
     )
 
     messages.append({"from": "VoteBot", "text": overview})
@@ -216,9 +218,17 @@ def handle_quick_confirmation(text, state, messages, room, ROOMS):
 
     elif cmd == "cancel":
         ROOMS[room]["pending_create"] = None
-        messages.append({"from": "VoteBot", "text": "Survey creation cancelled."})
+        state["step"] = "main"
+        messages.append({"from": "VoteBot", "text": "Survey creation cancelled. Type <strong>create</strong> to start a new survey."})
+        return jsonify(messages=messages)
+    
+    elif cmd == "reset":
+        # Clear all survey data and restart
+        state["temp"] = {}
+        state["step"] = "ask_mode"
+        messages.append({"from": "VoteBot", "text": "Survey creation reset. Choose mode: <strong>quick</strong> or <strong>advanced</strong>"})
         return jsonify(messages=messages)
 
     else:
-        messages.append({"from": "VoteBot", "text": "Type <strong>done</strong>, <strong>edit [field]</strong>, or <strong>cancel</strong>."})
+        messages.append({"from": "VoteBot", "text": "Type <strong>done</strong>, <strong>edit [field]</strong>, <strong>reset</strong>, or <strong>cancel</strong>."})
         return jsonify(messages=messages)
