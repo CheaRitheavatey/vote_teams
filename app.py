@@ -104,7 +104,7 @@ def api_message():
             
 
             display_text = f"block: {int(current_block) + 1} - Question {current_index + 1} ({current_index + 1}/{total_questions})"
-            messages.append({"from": "VoteBot", "text": display_text})
+            # messages.append({"from": "VoteBot", "text": display_text})
 
             # fetch this question
             data = fetch_question(enter_code, current_block, current_question)
@@ -129,9 +129,9 @@ def api_message():
                     range_config = data["config"].get("range_config", {})
                     min_val = range_config.get("min", 0)
                     max_val = range_config.get("max", 100)
-                    messages.append({"from": "VoteBot", "text": f"<strong>Question:</strong> {question_text}\n\n<strong>Range:</strong> {min_val} to {max_val}\n\nEnter a number between {min_val} and {max_val}:"})
+                    messages.append({"from": "VoteBot", "text": f"{display_text}\n\n<strong>Question:</strong> {question_text}\n\n<strong>Range:</strong> {min_val} to {max_val}\n\nEnter a number between {min_val} and {max_val}:"})
                 elif question_type == "TextQuestion":
-                    messages.append({"from": "VoteBot", "text": f"<strong>Question:</strong> {question_text}\n\nEnter your text answer:"})
+                    messages.append({"from": "VoteBot", "text": f"{display_text}\n\n<strong>Question:</strong> {question_text}\n\nEnter your text answer:"})
                 else:
                     # choicesingle or choicemulti
                     options = [v["DE"] for k, v in data["config"]["options"].items()]
@@ -146,6 +146,7 @@ def api_message():
 
                     header_text = f"<strong>Block {int(conf['block'])+1} — Question {current_index+1} ({current_index+1}/{total_questions})</strong>"
                     messages.append({"from": "VoteBot", "text": 
+                        
                         f"{header_text}<br><br>"
                         f"{question_type}<br><br>"
                         f"<strong>Question:</strong> {question_text}\n\n{options_text}\n\nEnter your choice (number):"})
