@@ -84,3 +84,39 @@ def submit_answer(enter_code, block_id, question_id, option_indexes):
     except Exception as e:
         print("Error parsing submit answer response:", e)
         return {"status_code": response.status_code, "text": response.text}
+    
+    
+    # helper method
+def fetch_vote_structure(enter_code):
+    resp = requests.get(f"{BASE_URL}/vote/{enter_code}", headers=headers)
+    if resp.status_code != 200:
+        print("Failed to fetch vote:", resp.status_code, resp.text)
+        return None
+    
+    data = resp.json().get("data", {})
+    return data.get("question_blocks", {})  # returns dict of blocks
+
+# idea: get one question
+# get next question
+def get_next_question(blocks, current_block, current_question):
+    block_ids = sorted(blocks.keys(), key=lambda x: int(x))
+    q_ids = sorted(blocks[current_block]["questions"].keys(), key=lambda x: int(x))
+
+    # Is there a next question in same block?
+    if current_question in q_ids:
+        idx = q_ids.index(current_question)
+        if idx + 1 < len(q_ids):
+            return current_block, q_ids[idx + 1]
+
+    # move to next block
+    if current_block in block_ids:
+        b_idx = block_ids.index(current_block)
+        if b_idx + 1 < len(block_ids):
+            next_block = block_ids[b_idx + 1]
+            next_q = sorted(blocks[next_block]["questions"].keys(), key=lambda x: int(x))[0]
+            return next_block, next_q
+
+    return None, None
+
+
+

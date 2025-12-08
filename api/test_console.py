@@ -1,7 +1,7 @@
 import requests
 import os
 from dotenv import load_dotenv
-from api.fetch_question import fetch_question, fetch_surveys
+from fetch_question import fetch_question, fetch_surveys
 from submit_answer import submit_answer
 from create_survey import create_survey
 

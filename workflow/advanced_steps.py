@@ -299,7 +299,7 @@ def handle_standalone_after_blocks(text, state, messages):
 
 def handle_advanced_overview(text, state, messages, room):
     """Handle final overview and survey creation"""
-    from app import ROOMS
+    from app_backup2 import ROOMS
     
     cmd = text.lower()
     
