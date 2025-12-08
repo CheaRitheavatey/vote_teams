@@ -468,7 +468,17 @@ def handle_advanced_overview(text, state, messages, room):
         ROOMS[room]["pending_create"] = None
         state["step"] = "main"  # Reset to main menu
         messages.append({"from": "VoteBot", "text": "Survey creation cancelled. Type <strong>create</strong> to start a new survey."})
+    elif cmd == "reset":
+        # Clear all survey data and restart
+        state["temp"] = {
+            "question_blocks": [],
+            "standalone_questions": [],
+            "current_block": None,
+            "current_question": None
+        }
+        state["step"] = "ask_email"
+        messages.append({"from": "VoteBot", "text": "Survey creation reset. Let's start over!\n\n<strong>Your email?</strong>"})
     else:
-        messages.append({"from": "VoteBot", "text": "Type <strong>done</strong>, <strong>add block</strong>, <strong>add question</strong>, or <strong>cancel</strong>"})
+        messages.append({"from": "VoteBot", "text": "Type <strong>done</strong>, <strong>add block</strong>, <strong>add question</strong>, <strong>reset</strong>, or <strong>cancel</strong>"})
     
     return jsonify(messages=messages)
