@@ -120,7 +120,35 @@ def create_survey_interactive():
     print(response.text)
 
 
-def create_survey(title, question_text, question_type, options, creator_email):
+def create_survey(title, question_text, question_type, options_or_config, creator_email):
+    """
+    Create a simple survey with one question.
+    For choice questions: options_or_config should be a list of option strings
+    For RangeSlider: options_or_config should be a dict with 'min' and 'max' keys
+    For TextQuestion: options_or_config can be None or empty dict
+    """
+    # Build question config based on type
+    question_config = {}
+    
+    if question_type in ["ChoiceSingle", "ChoiceMulti"]:
+        question_config = {
+            "option_type": "TEXT",
+            "options": {str(i): {"DE": opt} for i, opt in enumerate(options_or_config)}
+        }
+    elif question_type == "RangeSlider":
+        min_val = options_or_config.get("min", 0)
+        max_val = options_or_config.get("max", 100)
+        question_config = {
+            "range_config": {
+                "min": min_val,
+                "max": max_val,
+                "start": str(min_val),
+                "end": str(max_val),
+                "stepsize": 1
+            }
+        }
+    # TextQuestion doesn't need any config
+    
     survey_data = {
         "data": {
             "module": "Survey",
@@ -147,10 +175,7 @@ def create_survey(title, question_text, question_type, options, creator_email):
                             "question": {"DE": question_text},
                             "question_type": question_type,
                             "settings": {"mandatory": True, "grid": False},
-                            "config": {
-                                "option_type": "TEXT",
-                                "options": {str(i): {"DE": opt} for i, opt in enumerate(options)}
-                            },
+                            "config": question_config,
                             "analysis_mode": "FREE"
                         }
                     },

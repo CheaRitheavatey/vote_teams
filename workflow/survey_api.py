@@ -43,9 +43,16 @@ def create_advanced_survey(state_temp):
                     options_dict[str(opt_idx)] = {"DE": opt}
                 question_obj["config"]["option_type"] = "TEXT"
                 question_obj["config"]["options"] = options_dict
-            elif q["type"] == "Rating":
-                question_obj["config"]["min"] = q.get("rating_min", 0)
-                question_obj["config"]["max"] = q.get("rating_max", 100)
+            elif q["type"] == "RangeSlider":
+                min_val = q.get("rating_min", 0)
+                max_val = q.get("rating_max", 100)
+                question_obj["config"]["range_config"] = {
+                    "min": min_val,
+                    "max": max_val,
+                    "start": str(min_val),
+                    "end": str(max_val),
+                    "stepsize": 1
+                }
             
             questions_dict[str(q_idx)] = question_obj
         
@@ -98,9 +105,16 @@ def create_advanced_survey(state_temp):
                     options_dict[str(opt_idx)] = {"DE": opt}
                 question_obj["config"]["option_type"] = "TEXT"
                 question_obj["config"]["options"] = options_dict
-            elif q["type"] == "Rating":
-                question_obj["config"]["min"] = q.get("rating_min", 0)
-                question_obj["config"]["max"] = q.get("rating_max", 100)
+            elif q["type"] == "RangeSlider":
+                min_val = q.get("rating_min", 0)
+                max_val = q.get("rating_max", 100)
+                question_obj["config"]["range_config"] = {
+                    "min": min_val,
+                    "max": max_val,
+                    "start": str(min_val),
+                    "end": str(max_val),
+                    "stepsize": 1
+                }
             
             questions_dict[str(q_idx)] = question_obj
         

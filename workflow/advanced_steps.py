@@ -49,7 +49,8 @@ def handle_block_description(text, state, messages):
         "What type of question?\n\n"
         "1. Single Choice\n"
         "2. Multiple Choice\n"
-        "3. Rating (0-100 scale)"
+        "3. Rating (0-100 scale)\n"
+        "4. Free Text"
     )})
     return jsonify(messages=messages)
 
@@ -59,7 +60,8 @@ def handle_question_type(text, state, messages):
     q_type_map = {
         "1": "ChoiceSingle",
         "2": "ChoiceMulti",
-        "3": "Rating"
+        "3": "RangeSlider",
+        "4": "TextQuestion"
     }
     
     if text.strip() in q_type_map:
@@ -67,7 +69,7 @@ def handle_question_type(text, state, messages):
         state["step"] = "question_text"
         messages.append({"from": "VoteBot", "text": "<strong>Your question?</strong>"})
     else:
-        messages.append({"from": "VoteBot", "text": "Please select a valid option (1-3)"})
+        messages.append({"from": "VoteBot", "text": "Please select a valid option (1-4)"})
     return jsonify(messages=messages)
 
 
@@ -81,9 +83,15 @@ def handle_question_text(text, state, messages):
         state["temp"]["current_question"]["options"] = []
         state["step"] = "question_options"
         messages.append({"from": "VoteBot", "text": "<strong>Add options</strong>\nEnter options one per message. Type 'done' when finished."})
-    elif q_type == "Rating":
+    elif q_type == "RangeSlider":
         state["step"] = "rating_min"
         messages.append({"from": "VoteBot", "text": "<strong>Minimum rating value?</strong> (e.g., 0)"})
+    elif q_type == "TextQuestion":
+        # TextQuestion has no additional config needed
+        state["step"] = "question_confirm"
+        from api.validation import SurveyValidator
+        validator = SurveyValidator()
+        messages.append({"from": "VoteBot", "text": send_question_preview(state, validator)})
     return jsonify(messages=messages)
 
 
@@ -190,7 +198,7 @@ def handle_question_confirm(text, state, messages):
     
     elif cmd == "edit range":
         q_type = state["temp"]["current_question"]["type"]
-        if q_type == "Rating":
+        if q_type == "RangeSlider":
             state["step"] = "rating_min"
             messages.append({"from": "VoteBot", "text": "<strong>Minimum rating value?</strong> (e.g., 0)"})
         else:
@@ -212,7 +220,8 @@ def handle_more_questions_in_block(text, state, messages):
             "What type of question?\n\n"
             "1. Single Choice\n"
             "2. Multiple Choice\n"
-            "3. Rating (0-100 scale)"
+            "3. Rating (0-100 scale)\n"
+            "4. Free Text"
         )})
     elif text.lower() == "no":
         # Save block and ask if want to create another block
@@ -239,7 +248,8 @@ def handle_more_standalone(text, state, messages):
             "What type of question?\n\n"
             "1. Single Choice\n"
             "2. Multiple Choice\n"
-            "3. Rating (0-100 scale)"
+            "3. Rating (0-100 scale)\n"
+            "4. Free Text"
         )})
     elif text.lower() == "no":
         state["step"] = "advanced_overview"
@@ -275,7 +285,8 @@ def handle_standalone_after_blocks(text, state, messages):
             "What type of question?\n\n"
             "1. Single Choice\n"
             "2. Multiple Choice\n"
-            "3. Rating (0-100 scale)"
+            "3. Rating (0-100 scale)\n"
+            "4. Free Text"
         )})
     elif text.lower() == "no":
         state["step"] = "advanced_overview"
@@ -320,9 +331,16 @@ def handle_advanced_overview(text, state, messages, room):
                         options_dict = {str(i): {"DE": opt} for i, opt in enumerate(q["options"])}
                         question_obj["config"]["option_type"] = "TEXT"
                         question_obj["config"]["options"] = options_dict
-                    elif q["type"] == "Rating":
-                        question_obj["config"]["min"] = q.get("rating_min", 0)
-                        question_obj["config"]["max"] = q.get("rating_max", 100)
+                    elif q["type"] == "RangeSlider":
+                        min_val = q.get("rating_min", 0)
+                        max_val = q.get("rating_max", 100)
+                        question_obj["config"]["range_config"] = {
+                            "min": min_val,
+                            "max": max_val,
+                            "start": str(min_val),
+                            "end": str(max_val),
+                            "stepsize": 1
+                        }
                     
                     questions_dict[str(q_idx)] = question_obj
                 
@@ -361,9 +379,16 @@ def handle_advanced_overview(text, state, messages, room):
                         options_dict = {str(i): {"DE": opt} for i, opt in enumerate(q["options"])}
                         question_obj["config"]["option_type"] = "TEXT"
                         question_obj["config"]["options"] = options_dict
-                    elif q["type"] == "Rating":
-                        question_obj["config"]["min"] = q.get("rating_min", 0)
-                        question_obj["config"]["max"] = q.get("rating_max", 100)
+                    elif q["type"] == "RangeSlider":
+                        min_val = q.get("rating_min", 0)
+                        max_val = q.get("rating_max", 100)
+                        question_obj["config"]["range_config"] = {
+                            "min": min_val,
+                            "max": max_val,
+                            "start": str(min_val),
+                            "end": str(max_val),
+                            "stepsize": 1
+                        }
                     
                     questions_dict[str(q_idx)] = question_obj
                 
@@ -412,11 +437,14 @@ def handle_advanced_overview(text, state, messages, room):
                 enter_code = response.get("enter_code")
                 ROOMS[room]["last_survey_code"] = enter_code
                 ROOMS[room]["pending_create"] = None
+                state["step"] = "main"  # Reset to main menu
                 
                 messages.append({"from": "VoteBot", "text": (
                     f"<strong>✅ Survey created successfully!</strong>\n\n"
                     f"<strong>Survey Code:</strong> {enter_code}\n\n"
-                    "Type 'create' to make another survey"
+                    "Type <strong>create</strong> to make another survey, "
+                    "<strong>vote {enter_code}</strong> to participate, or "
+                    "<strong>result {enter_code}</strong> to see results."
                 )})
         except Exception as e:
             messages.append({"from": "VoteBot", "text": (
@@ -433,11 +461,13 @@ def handle_advanced_overview(text, state, messages, room):
             "What type of question?\n\n"
             "1. Single Choice\n"
             "2. Multiple Choice\n"
-            "3. Rating (0-100 scale)"
+            "3. Rating (0-100 scale)\n"
+            "4. Free Text"
         )})
     elif cmd == "cancel":
         ROOMS[room]["pending_create"] = None
-        messages.append({"from": "VoteBot", "text": "Survey creation cancelled."})
+        state["step"] = "main"  # Reset to main menu
+        messages.append({"from": "VoteBot", "text": "Survey creation cancelled. Type <strong>create</strong> to start a new survey."})
     else:
         messages.append({"from": "VoteBot", "text": "Type <strong>done</strong>, <strong>add block</strong>, <strong>add question</strong>, or <strong>cancel</strong>"})
     
