@@ -8,7 +8,7 @@ from flask import Flask, render_template, request, jsonify
 from api.fetch_question import fetch_question, fetch_surveys, fetch_survey_list
 # from api.submit_answer import submit_answer, fetch_vote_structure, get_next_question
 from api.test_submit import submit_all_answers, fetch_vote_structure, get_next_question
-from api.get_result import get_survey_results
+from api.get_result import get_survey_results, get_all_question_results
 from api.validation import SurveyValidator
 
 # Import workflow modules
@@ -423,14 +423,18 @@ def api_message():
         if param:
             # Get results for specific code
             survey_code = param.strip()
-            results_data = get_survey_results(survey_code, "0", "0")
-            messages.append({"from": "VoteBot", "text": results_data})
+            
+            result_text = get_all_question_results(survey_code)
+            messages.append({"from": "VoteBot", "text": f"<strong>{result_text}</strong>"})
+            # results_data = get_survey_results(survey_code, "0", "0")
+            # messages.append({"from": "VoteBot", "text": results_data})
         else:
             # Get results for last created survey
             last_code = ROOMS[room].get("last_survey_code")
             if last_code:
-                results_data = get_survey_results(last_code, "0", "0")
-                messages.append({"from": "VoteBot", "text": results_data})
+                result_text = get_all_question_results(last_code)
+                # results_data = get_survey_results(last_code, "0", "0")
+                messages.append({"from": "VoteBot", "text": result_text})
             else:
                 messages.append({"from": "VoteBot", "text": "No survey created yet. Use 'result <code>' to get results for a specific survey."})
         return jsonify(messages=messages)
