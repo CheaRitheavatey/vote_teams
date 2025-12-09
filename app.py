@@ -115,27 +115,27 @@ def api_message():
         # === VOTE FLOW ===
     if command == "vote":
         if param:
-            # Direct vote with code
+            # direct vote with code
             enter_code = param.strip()
 
-            # 1) Load full vote structure
+            # 1 load full vote structure
             blocks = fetch_vote_structure(enter_code)
             if not blocks:
                 messages.append({"from": "VoteBot", "text": "Survey has no questions or could not be loaded."})
                 return jsonify(messages=messages)
 
-            # 2) Store structure and reset collected answers for this room
+            # 2 store structure and reset collected answers for this room
             ROOMS[room]["vote_block"] = blocks
             ROOMS[room]["vote_answer"] = {}
 
-            # 3) Determine first block and first question
+            # 3 determine first block and first question
             block_ids = sorted(blocks.keys(), key=lambda x: int(x))
             current_block = block_ids[0]
 
             question_ids = sorted(blocks[current_block]["questions"].keys(), key=lambda x: int(x))
             current_question = question_ids[0]
 
-            # 4) Fetch first question details
+            # 4 fetch first question detail
             data = fetch_question(enter_code, current_block, current_question)
             if not data:
                 messages.append({"from": "VoteBot", "text": "Error fetching first question."})
@@ -144,7 +144,7 @@ def api_message():
             question_type = data.get("question_type", "")
             question_text = data["question"]["DE"]
 
-            # 5) Remember what we are waiting for
+            # 5 remember what we are waiting for
             ROOMS[room]["pending_confirmation"] = {
                 "code": enter_code,
                 "block": current_block,
@@ -152,7 +152,7 @@ def api_message():
                 "type": question_type
             }
 
-            # 6) Display first question
+            # 6 display first question
             total_questions = len(blocks[current_block]["questions"])
             header_text = (
                 f"<strong>Block {int(current_block) + 1} — "
@@ -196,7 +196,7 @@ def api_message():
                 })
 
         else:
-            # List available surveys
+            # list available surveys
             available_surveys = fetch_survey_list()
             if not available_surveys:
                 messages.append({"from": "VoteBot", "text": "No surveys available right now."})
