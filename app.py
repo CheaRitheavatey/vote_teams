@@ -2,9 +2,12 @@
 Vote Teams - Survey Creation Chatbot
 Main Flask application with modular workflow handlers
 """
+import os
+import requests
 from flask import Flask, render_template, request, jsonify
 from api.fetch_question import fetch_question, fetch_surveys, fetch_survey_list
-from api.submit_answer import submit_answer, fetch_vote_structure, get_next_question
+# from api.submit_answer import submit_answer, fetch_vote_structure, get_next_question
+from api.test_submit import submit_all_answers, fetch_vote_structure, get_next_question
 from api.get_result import get_survey_results
 from api.validation import SurveyValidator
 
@@ -29,6 +32,13 @@ from workflow.quick_mode import (
     handle_quick_confirmation
 )
 from workflow.survey_api import create_advanced_survey
+BASE_URL = "https://vote2.telekom.net/api/v1"
+API_KEY = os.getenv("API_KEY")
+
+headers = {
+    "x-api-key": API_KEY,
+    "Content-Type": "application/json"
+}
 
 app = Flask(__name__)
 
@@ -41,9 +51,31 @@ ROOMS = {
         "pending_create": None,
         "last_survey_code": None,
         "pending_confirmation": None,
-        "pending_vote_for_code": None
+        "pending_vote_for_code": None,
+        "vote_block": None, # fetch the vote structure
+        "vote_answer": {} # store answer first before send to endpoint
     }
 }
+    # function to build answer
+def build_full_answer_payload(blocks, answer_dict):
+    payload_blocks = {}
+    for (block_id, q_id), ans_list in answer_dict.items():
+        b_id = str(block_id)
+        qid = str(q_id)
+        if b_id not in payload_blocks:
+            payload_blocks[b_id] = {"questions": {}}
+        payload_blocks[b_id]["questions"][qid] = {
+            "answers": [
+                {
+                    "0": {
+                        "0": ans_list
+                    }
+                }
+            ],
+            "lang": "DE",
+            "skip": False
+        }
+    return {"blocks": payload_blocks}
 
 @app.route("/")
 def index():
@@ -66,7 +98,9 @@ def api_message():
             "pending_create": None,
             "last_survey_code": None,
             "pending_confirmation": None,
-            "pending_vote_for_code": None
+            "pending_vote_for_code": None,
+            "vote_block": None,
+            "vote_answer": {}
         }
 
     state = ROOMS[room].get("pending_create")
@@ -76,62 +110,91 @@ def api_message():
     parts = text_lower.split(maxsplit=1)
     command = parts[0] if parts else ""
     param = parts[1] if len(parts) > 1 else None
-
-    # === VOTE FLOW ===
-    # Handle "vote" or "vote <code>"
+    
+        
+        # === VOTE FLOW ===
     if command == "vote":
         if param:
+            # Direct vote with code
             enter_code = param.strip()
-            blocks = fetch_vote_structure(enter_code)
 
+            # 1) Load full vote structure
+            blocks = fetch_vote_structure(enter_code)
             if not blocks:
-                messages.append({"from": "VoteBot", "text": "Survey has no questions."})
+                messages.append({"from": "VoteBot", "text": "Survey has no questions or could not be loaded."})
                 return jsonify(messages=messages)
 
+            # 2) Store structure and reset collected answers for this room
+            ROOMS[room]["vote_block"] = blocks
+            ROOMS[room]["vote_answer"] = {}
+
+            # 3) Determine first block and first question
             block_ids = sorted(blocks.keys(), key=lambda x: int(x))
             current_block = block_ids[0]
 
             question_ids = sorted(blocks[current_block]["questions"].keys(), key=lambda x: int(x))
             current_question = question_ids[0]
 
-            current_index = question_ids.index(current_question)
-            total_questions = len(question_ids)
-
-            display_text = f"Block: {int(current_block) + 1} - Question {current_index + 1} ({current_index + 1}/{total_questions})"
-            messages.append({"from": "VoteBot", "text": display_text})
-
+            # 4) Fetch first question details
             data = fetch_question(enter_code, current_block, current_question)
+            if not data:
+                messages.append({"from": "VoteBot", "text": "Error fetching first question."})
+                return jsonify(messages=messages)
 
+            question_type = data.get("question_type", "")
+            question_text = data["question"]["DE"]
+
+            # 5) Remember what we are waiting for
             ROOMS[room]["pending_confirmation"] = {
                 "code": enter_code,
                 "block": current_block,
                 "question": current_question,
-                "type": data.get("question_type", "")
+                "type": question_type
             }
 
-            if data:
-                question_type = data.get("question_type", "")
-                question_text = data["question"]["DE"]
+            # 6) Display first question
+            total_questions = len(blocks[current_block]["questions"])
+            header_text = (
+                f"<strong>Block {int(current_block) + 1} — "
+                f"Question 1 (1/{total_questions})</strong><br><br>"
+            )
 
-                if question_type == "RangeSlider":
-                    range_config = data["config"].get("range_config", {})
-                    min_val = range_config.get("min", 0)
-                    max_val = range_config.get("max", 100)
-                    messages.append({"from": "VoteBot", "text": f"<strong>Question:</strong> {question_text}\n\n<strong>Range:</strong> {min_val} to {max_val}\n\nEnter a number between {min_val} and {max_val}:"})
-                elif question_type == "TextQuestion":
-                    messages.append({"from": "VoteBot", "text": f"<strong>Question:</strong> {question_text}\n\nEnter your text answer:"})
-                else:
-                    # ChoiceSingle or ChoiceMulti
-                    options = [v["DE"] for k, v in data["config"]["options"].items()]
-                    options_text = "\n".join([f"{i}. {opt}" for i, opt in enumerate(options)])
-
-                    header_text = f"<strong>Block {int(current_block)+1} — Question {current_index+1} ({current_index+1}/{total_questions})</strong>"
-                    messages.append({"from": "VoteBot", "text":
-                        f"{header_text}<br><br>"
-                        f"{question_type}<br><br>"
-                        f"<strong>Question:</strong> {question_text}\n\n{options_text}\n\nEnter your choice (number):"})
+            if question_type == "RangeSlider":
+                range_config = data["config"].get("range_config", {})
+                min_val = range_config.get("min", 0)
+                max_val = range_config.get("max", 100)
+                messages.append({
+                    "from": "VoteBot",
+                    "text": (
+                        f"{header_text}"
+                        f"<strong>Question:</strong> {question_text}<br>"
+                        f"<strong>Range:</strong> {min_val}–{max_val}<br>"
+                        "Enter a number:"
+                    )
+                })
+            elif question_type == "TextQuestion":
+                messages.append({
+                    "from": "VoteBot",
+                    "text": (
+                        f"{header_text}"
+                        f"<strong>Question:</strong> {question_text}<br>"
+                        "Enter your text answer:"
+                    )
+                })
             else:
-                messages.append({"from": "VoteBot", "text": f"Error: Survey code '{enter_code}' not found."})
+                options = [v["DE"] for _, v in data["config"]["options"].items()]
+                options_text = "<br>".join([f"{i}. {opt}" for i, opt in enumerate(options)])
+                messages.append({
+                    "from": "VoteBot",
+                    "text": (
+                        f"{header_text}"
+                        f"<strong>Type:</strong> {question_type}<br><br>"
+                        f"<strong>Question:</strong> {question_text}<br>"
+                        f"{options_text}<br><br>"
+                        "Enter your choice number:"
+                    )
+                })
+
         else:
             # List available surveys
             available_surveys = fetch_survey_list()
@@ -143,6 +206,7 @@ def api_message():
                 messages.append({"from": "VoteBot", "text": f"Available surveys:\n{survey_list}\n\nEnter survey number to vote:"})
         return jsonify(messages=messages)
 
+    # select survey by index after "vote"
     if ROOMS[room].get("pending_vote_for_code"):
         try:
             idx = int(text) - 1
@@ -150,27 +214,72 @@ def api_message():
             if 0 <= idx < len(surveys):
                 enter_code = surveys[idx]["enter_code"]
                 ROOMS[room]["pending_vote_for_code"] = None
-                
-                data = fetch_question(enter_code, "0", "0")
+
+                blocks = fetch_vote_structure(enter_code)
+                if not blocks:
+                    messages.append({"from": "VoteBot", "text": "Survey has no questions or could not be loaded."})
+                    return jsonify(messages=messages)
+
+                ROOMS[room]["vote_block"] = blocks
+                ROOMS[room]["vote_answer"] = {}
+
+                block_ids = sorted(blocks.keys(), key=lambda x: int(x))
+                current_block = block_ids[0]
+                question_ids = sorted(blocks[current_block]["questions"].keys(), key=lambda x: int(x))
+                current_question = question_ids[0]
+
+                data = fetch_question(enter_code, current_block, current_question)
                 if data:
                     question_type = data.get("question_type", "")
-                    ROOMS[room]["pending_confirmation"] = {"code": enter_code, "block": "0", "question": "0", "type": question_type}
-                    
                     question_text = data["question"]["DE"]
-                    
-                    # Handle different question types
+                    ROOMS[room]["pending_confirmation"] = {
+                        "code": enter_code,
+                        "block": current_block,
+                        "question": current_question,
+                        "type": question_type
+                    }
+
+                    total_questions = len(blocks[current_block]["questions"])
+                    header_text = (
+                        f"<strong>Block {int(current_block) + 1} — "
+                        f"Question 1 (1/{total_questions})</strong><br><br>"
+                    )
+
                     if question_type == "RangeSlider":
                         range_config = data["config"].get("range_config", {})
                         min_val = range_config.get("min", 0)
                         max_val = range_config.get("max", 100)
-                        messages.append({"from": "VoteBot", "text": f"<strong>Question:</strong> {question_text}\n\n<strong>Range:</strong> {min_val} to {max_val}\n\nEnter a number between {min_val} and {max_val}:"})
+                        messages.append({
+                            "from": "VoteBot",
+                            "text": (
+                                f"{header_text}"
+                                f"<strong>Question:</strong> {question_text}<br>"
+                                f"<strong>Range:</strong> {min_val}–{max_val}<br>"
+                                "Enter a number:"
+                            )
+                        })
                     elif question_type == "TextQuestion":
-                        messages.append({"from": "VoteBot", "text": f"<strong>Question:</strong> {question_text}\n\nEnter your text answer:"})
+                        messages.append({
+                            "from": "VoteBot",
+                            "text": (
+                                f"{header_text}"
+                                f"<strong>Question:</strong> {question_text}<br>"
+                                "Enter your text answer:"
+                            )
+                        })
                     else:
-                        # ChoiceSingle or ChoiceMulti
-                        options = [v["DE"] for k, v in data["config"]["options"].items()]
-                        options_text = "\n".join([f"{i}. {opt}" for i, opt in enumerate(options)])
-                        messages.append({"from": "VoteBot", "text": f"<strong>Question:</strong> {question_text}\n\n{options_text}\n\nEnter your choice (number):"})
+                        options = [v["DE"] for _, v in data["config"]["options"].items()]
+                        options_text = "<br>".join([f"{i}. {opt}" for i, opt in enumerate(options)])
+                        messages.append({
+                            "from": "VoteBot",
+                            "text": (
+                                f"{header_text}"
+                                f"<strong>Type:</strong> {question_type}<br><br>"
+                                f"<strong>Question:</strong> {question_text}<br>"
+                                f"{options_text}<br><br>"
+                                "Enter your choice number:"
+                            )
+                        })
                 else:
                     messages.append({"from": "VoteBot", "text": "Error fetching question."})
             else:
@@ -178,6 +287,8 @@ def api_message():
         except ValueError:
             messages.append({"from": "VoteBot", "text": "Please enter a valid number."})
         return jsonify(messages=messages)
+
+    # handle answering and moving to next question
     if ROOMS[room].get("pending_confirmation"):
         conf = ROOMS[room]["pending_confirmation"]
         code = conf["code"]
@@ -185,32 +296,56 @@ def api_message():
         q = conf["question"]
         q_type = conf["type"]
 
-        # Submit answer
+        # get structure + current answers
+        blocks = ROOMS[room].get("vote_block") or fetch_vote_structure(code)
+        ROOMS[room]["vote_block"] = blocks
+        answers_dict = ROOMS[room].get("vote_answers", {})
+
+        # parse this answer
         try:
             if q_type == "TextQuestion":
-                answer_payload = [text]
+                ans_list = [{"answer": text, "condanswer": "string"}]
             else:
-                answer_payload = [int(text)]
-
-            result = submit_answer(code, block, q, answer_payload)
+                value = int(text)
+                ans_list = [{"answer": str(value), "condanswer": "string"}]
         except ValueError:
             messages.append({"from": "VoteBot", "text": "Please enter a valid answer."})
             return jsonify(messages=messages)
 
-         # Load structure to find next question
-        blocks = fetch_vote_structure(code)
+        # store but do not send yet
+        answers_dict[(block, q)] = ans_list
+        ROOMS[room]["vote_answers"] = answers_dict
+
+        # next question
         next_block, next_q = get_next_question(blocks, block, q)
 
         if next_block is None:
-            # No more questions → finish survey
+            # no more questions -> send all at once
+            payload = build_full_answer_payload(blocks, answers_dict)
+            resp = requests.post(
+                f"{BASE_URL}/answers/{code}",
+                headers=headers,
+                json=payload
+            )
+
             ROOMS[room]["pending_confirmation"] = None
-            messages.append({"from": "VoteBot", "text": "All questions answered! Thank you!"})
+            ROOMS[room]["vote_block"] = None
+            ROOMS[room]["vote_answer"] = {}
+
+            if 200 <= resp.status_code < 300:
+                messages.append({"from": "VoteBot", "text": "All questions answered and submitted. Thank you!"})
+            else:
+                messages.append({"from": "VoteBot", "text": f"Failed to submit answers: {resp.status_code} {resp.text}"})
             return jsonify(messages=messages)
 
-        # There IS another question → load it
+        # load next question
         data = fetch_question(code, next_block, next_q)
-        q_type = data["question_type"]
+        if not data:
+            ROOMS[room]["pending_confirmation"] = None
+            messages.append({"from": "VoteBot", "text": "Error loading next question."})
+            return jsonify(messages=messages)
 
+        q_type = data["question_type"]
         ROOMS[room]["pending_confirmation"] = {
             "code": code,
             "block": next_block,
@@ -220,7 +355,6 @@ def api_message():
 
         question_text = data["question"]["DE"]
 
-        # Display next question
         if q_type == "RangeSlider":
             c = data["config"]["range_config"]
             messages.append({
@@ -230,13 +364,11 @@ def api_message():
                     f"Range: {c['min']}–{c['max']}<br>"
                     "Enter a number:"
             })
-
         elif q_type == "TextQuestion":
             messages.append({
                 "from": "VoteBot",
                 "text": f"<strong>Question:</strong> {question_text}<br>Enter text:"
             })
-
         else:
             options = data["config"]["options"]
             text_opts = "<br>".join([f"{i}. {opt['DE']}" for i, opt in options.items()])

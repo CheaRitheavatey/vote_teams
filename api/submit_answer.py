@@ -89,6 +89,7 @@ def submit_answer(enter_code, block_id, question_id, option_indexes):
     # helper method
 def fetch_vote_structure(enter_code):
     resp = requests.get(f"{BASE_URL}/vote/{enter_code}", headers=headers)
+    # print("vote status: " + resp.status_code)
     if resp.status_code != 200:
         print("Failed to fetch vote:", resp.status_code, resp.text)
         return None
@@ -100,21 +101,24 @@ def fetch_vote_structure(enter_code):
 # get next question
 def get_next_question(blocks, current_block, current_question):
     block_ids = sorted(blocks.keys(), key=lambda x: int(x))
+    
+    if current_block not in block_ids:
+        return None, None
+    
     q_ids = sorted(blocks[current_block]["questions"].keys(), key=lambda x: int(x))
-
     # Is there a next question in same block?
     if current_question in q_ids:
         idx = q_ids.index(current_question)
         if idx + 1 < len(q_ids):
             return current_block, q_ids[idx + 1]
 
-    # move to next block
-    if current_block in block_ids:
-        b_idx = block_ids.index(current_block)
-        if b_idx + 1 < len(block_ids):
-            next_block = block_ids[b_idx + 1]
-            next_q = sorted(blocks[next_block]["questions"].keys(), key=lambda x: int(x))[0]
-            return next_block, next_q
+    
+    b_idx = block_ids.index(current_block)
+    if b_idx + 1 < len(block_ids):
+        next_block = block_ids[b_idx + 1]
+        next_q = sorted(blocks[next_block]["questions"].keys(), key=lambda x: int(x))
+        if next_q:
+            return next_block, next_q[0]
 
     return None, None
 
