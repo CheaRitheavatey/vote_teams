@@ -81,34 +81,27 @@ def api_message():
     # Handle "vote" or "vote <code>"
     if command == "vote":
         if param:
-            # Direct vote with code
             enter_code = param.strip()
-            
             blocks = fetch_vote_structure(enter_code)
-            
+
             if not blocks:
                 messages.append({"from": "VoteBot", "text": "Survey has no questions."})
                 return jsonify(messages=messages)
-            
-            # calculate the total num of question to disply
+
             block_ids = sorted(blocks.keys(), key=lambda x: int(x))
-            # get the first block in sorted order
             current_block = block_ids[0]
-            
-            
+
             question_ids = sorted(blocks[current_block]["questions"].keys(), key=lambda x: int(x))
             current_question = question_ids[0]
-            
+
             current_index = question_ids.index(current_question)
             total_questions = len(question_ids)
-            
 
-            display_text = f"block: {int(current_block) + 1} - Question {current_index + 1} ({current_index + 1}/{total_questions})"
-            # messages.append({"from": "VoteBot", "text": display_text})
+            display_text = f"Block: {int(current_block) + 1} - Question {current_index + 1} ({current_index + 1}/{total_questions})"
+            messages.append({"from": "VoteBot", "text": display_text})
 
-            # fetch this question
             data = fetch_question(enter_code, current_block, current_question)
-            
+
             ROOMS[room]["pending_confirmation"] = {
                 "code": enter_code,
                 "block": current_block,
@@ -116,37 +109,24 @@ def api_message():
                 "type": data.get("question_type", "")
             }
 
-            # get next question
-            
             if data:
                 question_type = data.get("question_type", "")
-                ROOMS[room]["pending_confirmation"] = {"code": enter_code, "block": "0", "question": "0", "type": question_type}
-                
                 question_text = data["question"]["DE"]
-                
-                # Handle different question types
+
                 if question_type == "RangeSlider":
                     range_config = data["config"].get("range_config", {})
                     min_val = range_config.get("min", 0)
                     max_val = range_config.get("max", 100)
-                    messages.append({"from": "VoteBot", "text": f"{display_text}\n\n<strong>Question:</strong> {question_text}\n\n<strong>Range:</strong> {min_val} to {max_val}\n\nEnter a number between {min_val} and {max_val}:"})
+                    messages.append({"from": "VoteBot", "text": f"<strong>Question:</strong> {question_text}\n\n<strong>Range:</strong> {min_val} to {max_val}\n\nEnter a number between {min_val} and {max_val}:"})
                 elif question_type == "TextQuestion":
-                    messages.append({"from": "VoteBot", "text": f"{display_text}\n\n<strong>Question:</strong> {question_text}\n\nEnter your text answer:"})
+                    messages.append({"from": "VoteBot", "text": f"<strong>Question:</strong> {question_text}\n\nEnter your text answer:"})
                 else:
-                    # choicesingle or choicemulti
+                    # ChoiceSingle or ChoiceMulti
                     options = [v["DE"] for k, v in data["config"]["options"].items()]
                     options_text = "\n".join([f"{i}. {opt}" for i, opt in enumerate(options)])
-                    
-                    # calculate block quesiton
-                    blocks = fetch_vote_structure(conf["code"])
-                    question_ids = sorted(blocks[conf["block"]]["questions"].keys(), key=lambda x: int(x))
 
-                    current_index = question_ids.index(conf["question"])
-                    total_questions = len(question_ids)
-
-                    header_text = f"<strong>Block {int(conf['block'])+1} — Question {current_index+1} ({current_index+1}/{total_questions})</strong>"
-                    messages.append({"from": "VoteBot", "text": 
-                        
+                    header_text = f"<strong>Block {int(current_block)+1} — Question {current_index+1} ({current_index+1}/{total_questions})</strong>"
+                    messages.append({"from": "VoteBot", "text":
                         f"{header_text}<br><br>"
                         f"{question_type}<br><br>"
                         f"<strong>Question:</strong> {question_text}\n\n{options_text}\n\nEnter your choice (number):"})
@@ -224,7 +204,7 @@ def api_message():
         if next_block is None:
             # No more questions → finish survey
             ROOMS[room]["pending_confirmation"] = None
-            messages.append({"from": "VoteBot", "text": "🎉 All questions answered! Thank you!"})
+            messages.append({"from": "VoteBot", "text": "All questions answered! Thank you!"})
             return jsonify(messages=messages)
 
         # There IS another question → load it
