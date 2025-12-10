@@ -8,7 +8,7 @@ from flask import Flask, render_template, request, jsonify
 from api.fetch_question import fetch_question, fetch_surveys, fetch_survey_list
 # from api.submit_answer import submit_answer, fetch_vote_structure, get_next_question
 # from api.test_submit import submit_all_answers, fetch_vote_structure, get_next_question
-from api.vote_runtime import fetch_vote_structure, get_next_question, build_full_answer_payload,submit_all_answers,question_type_label
+from api.vote_runtime import fetch_vote_structure, get_next_question, build_full_answer_payload,submit_all_answers
 from api.get_result import get_full_survey_result
 from api.validation import SurveyValidator
 
