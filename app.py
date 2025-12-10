@@ -8,7 +8,7 @@ from flask import Flask, render_template, request, jsonify
 from api.fetch_question import fetch_question, fetch_surveys, fetch_survey_list
 # from api.submit_answer import submit_answer, fetch_vote_structure, get_next_question
 from api.test_submit import submit_all_answers, fetch_vote_structure, get_next_question
-from api.get_result import get_survey_results, get_all_question_results
+from api.get_result import get_full_survey_result
 from api.validation import SurveyValidator
 
 # Import workflow modules
@@ -424,15 +424,15 @@ def api_message():
             # Get results for specific code
             survey_code = param.strip()
             
-            result_text = get_all_question_results(survey_code)
-            messages.append({"from": "VoteBot", "text": f"<strong>{result_text}</strong>"})
+            result_text = get_full_survey_result(survey_code)
+            messages.append({"from": "VoteBot", "text": f"{result_text}"})
             # results_data = get_survey_results(survey_code, "0", "0")
             # messages.append({"from": "VoteBot", "text": results_data})
         else:
             # Get results for last created survey
             last_code = ROOMS[room].get("last_survey_code")
             if last_code:
-                result_text = get_all_question_results(last_code)
+                result_text = get_full_survey_result(last_code)
                 # results_data = get_survey_results(last_code, "0", "0")
                 messages.append({"from": "VoteBot", "text": result_text})
             else:
