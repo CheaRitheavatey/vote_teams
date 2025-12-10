@@ -16,10 +16,15 @@ headers = {
 
 def fetch_vote_structure(enter_code):
     resp = requests.get(f"{BASE_URL}/vote/{enter_code}", headers=headers)
+    print("GET /vote status:", resp.status_code)
     if resp.status_code != 200:
+        print("Body:", resp.text)
         return None
+
     data = resp.json().get("data", {})
-    return data.get("question_blocks", {})
+    # system uses "question_blocks"
+    blocks = data.get("question_blocks", {})
+    return blocks
 
 def get_next_question(blocks, current_block, current_question):
     block_ids = sorted(blocks.keys(), key=lambda x: int(x))
@@ -71,3 +76,23 @@ def submit_all_answers(enter_code, payload):
         json=payload
     )
     return resp
+
+
+
+# add another helper to help with label to display the question type
+def question_type_label(q):
+    qtype = q.get("type", "").upper()
+    
+    if qtype in ("TEXT", "STRING", "INPUT"):
+        return "Text Question"
+
+    if qtype in ("SINGLECHOICE", "SELECTONE", "RADIO"):
+        return "Single Choice"
+
+    if qtype in ("MULTICHOICE", "SELECTMULTI", "CHECKBOX"):
+        return "Multiple Choice"
+
+    if qtype in ("RANGE", "SLIDER"):
+        return "Range / Slider"
+
+    return f"{qtype}"
