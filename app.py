@@ -210,7 +210,7 @@ def api_message():
                     "from": "VoteBot",
                     "text": (
                         f"{header_text}{question_text} ({question_type})<br>"
-                        f"Options: {options_text}<br><br>"
+                        f"Options: <br>{options_text}<br><br>"
                         "Enter your choice number:"
                     )
                 })
@@ -343,29 +343,51 @@ def api_message():
         }
 
         question_text = data["question"]["DE"]
-
+        
+        block_title = (
+            blocks[next_block].get("title", {}).get("DE")
+            or blocks[next_block].get("title", {}).get("EN")
+            or ""
+        )
+        q_ids = sorted(blocks[next_block]["questions"].keys(), key=lambda x: int(x))
+        q_index = q_ids.index(next_q) + 1
+        total_questions = len(q_ids)
+        
+        
+        header_block = f"Block {int(next_block) + 1}: {block_title}<br>"
+        header_q = f"Question {q_index} ({q_index}/{total_questions}): {question_text} ({q_type})<br>"
+        
         if q_type == "RangeSlider":
             c = data["config"]["range_config"]
             messages.append({
                 "from": "VoteBot",
-                "text":
-                    f"<strong>Question:</strong> {question_text}<br>"
-                    f"Range: {c['min']}–{c['max']}<br>"
-                    "Enter a number:"
+                "text": (
+                    f"{header_block}"
+                    f"{header_q}"
+                    f"Range: {c['min']}–{c['max']}<br><br>"
+                    "Enter number:")
             })
         elif q_type == "TextQuestion":
             messages.append({
                 "from": "VoteBot",
-                "text": f"<strong>Question:</strong> {question_text}<br>Enter text:"
-            })
+                "text": (f"{header_block}"
+                        f"{header_q}<br>"
+                        "Enter text:")
+                        })
         else:
             options = data["config"]["options"]
             text_opts = "<br>".join([f"{i}. {opt['DE']}" for i, opt in options.items()])
+            options_html = "<br>".join(text_opts)
             messages.append({
                 "from": "VoteBot",
                 "text":
-                    f"<strong>Question:</strong> {question_text}<br>{text_opts}<br>"
-                    "Enter your choice number:"
+                   (
+                    f"{header_block}"
+                    f"{header_q}"
+                    "Options:<br>"
+                    f"{options_html}<br><br>"
+                    "Enter your choice:"
+                )
             })
 
         return jsonify(messages=messages)
