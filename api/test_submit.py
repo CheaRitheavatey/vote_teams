@@ -142,38 +142,38 @@ def submit_all_answers(enter_code, payload):
     print("Body:", resp.text)
     return resp
 
-# def interactive_full_vote():
-#     enter_code = input("Enter survey code: ").strip()
+def interactive_full_vote():
+    enter_code = input("Enter survey code: ").strip()
 
-#     blocks = fetch_vote_structure(enter_code)
-#     if not blocks:
-#         print("No blocks found.")
-#         return
+    blocks = fetch_vote_structure(enter_code)
+    if not blocks:
+        print("No blocks found.")
+        return
 
-#     # Start with the first block & first question
-#     block_ids = sorted(blocks.keys(), key=lambda x: int(x))
-#     current_block = block_ids[0]
-#     q_ids = sorted(blocks[current_block]["questions"].keys(), key=lambda x: int(x))
-#     current_question = q_ids[0]
+    # Start with the first block & first question
+    block_ids = sorted(blocks.keys(), key=lambda x: int(x))
+    current_block = block_ids[0]
+    q_ids = sorted(blocks[current_block]["questions"].keys(), key=lambda x: int(x))
+    current_question = q_ids[0]
 
-#     # Dictionary to store all answers before sending:
-#     # key: (block_id, question_id), value: list[ {answer, condanswer} ]
-#     user_answers = {}
+    # Dictionary to store all answers before sending:
+    # key: (block_id, question_id), value: list[ {answer, condanswer} ]
+    user_answers = {}
 
-#     while current_block is not None and current_question is not None:
-#         question = blocks[current_block]["questions"][current_question]
-#         ans_list = ask_for_answer(question)
-#         if ans_list is not None:
-#             user_answers[(current_block, current_question)] = ans_list
+    while current_block is not None and current_question is not None:
+        question = blocks[current_block]["questions"][current_question]
+        ans_list = ask_for_answer(question)
+        if ans_list is not None:
+            user_answers[(current_block, current_question)] = ans_list
 
-#         # find next question
-#         current_block, current_question = get_next_question(blocks, current_block, current_question)
+        # find next question
+        current_block, current_question = get_next_question(blocks, current_block, current_question)
 
-#     print("\nAll questions answered. Building payload...")
-#     payload = build_full_answer_payload(blocks, user_answers)
-#     print("Final payload:", payload)
+    print("\nAll questions answered. Building payload...")
+    payload = build_full_answer_payload(blocks, user_answers)
+    print("Final payload:", payload)
 
-#     submit_all_answers(enter_code, payload)
+    submit_all_answers(enter_code, payload)
 
-# if __name__ == "__main__":
-#     interactive_full_vote()
+if __name__ == "__main__":
+    interactive_full_vote()
