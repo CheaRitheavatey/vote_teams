@@ -9,7 +9,7 @@ from api.create_survey import create_survey
 def handle_quick_mode_selection(state, messages):
     """Initialize quick mode workflow"""
     state["step"] = "ask_email"
-    messages.append({"from": "VoteBot", "text": "Let's create your survey!\n\n<strong>Your email?</strong>"})
+    messages.append({"from": "VoteBot", "text": "Let's create your survey!\n\n📧 <strong>Your email?</strong>"})
     return jsonify(messages=messages)
 
 
@@ -17,12 +17,12 @@ def handle_quick_email(text, state, messages):
     """Handle email input for quick mode"""
     email_pattern = r'^[a-zA-Z0-9._%+-]+@telekom\.(com|de)$'
     if not re.fullmatch(email_pattern, text.strip()):
-        messages.append({"from": "VoteBot", "text": "Please enter a valid email address. Only @telekom.com or @telekom.de domains are allowed."})
+        messages.append({"from": "VoteBot", "text": "⚠️ Please enter a valid email address. Only @telekom.com or @telekom.de domains are allowed."})
         return jsonify(messages=messages)
     
     state["temp"]["email"] = text.strip()
     state["step"] = "ask_title"
-    messages.append({"from": "VoteBot", "text": "Great! Now, what's the survey title?"})
+    messages.append({"from": "VoteBot", "text": "Great! ✓\n\n📝 <strong>Survey title?</strong>"})
     return jsonify(messages=messages)
 
 
@@ -30,7 +30,7 @@ def handle_quick_title(text, state, messages):
     """Handle survey title input"""
     state["temp"]["title"] = text
     state["step"] = "ask_question"
-    messages.append({"from": "VoteBot", "text": "What's your question?"})
+    messages.append({"from": "VoteBot", "text": "✓\n\n❓ <strong>Your question?</strong>"})
     return jsonify(messages=messages)
 
 
@@ -39,11 +39,11 @@ def handle_quick_question(text, state, messages):
     state["temp"]["question"] = text
     state["step"] = "ask_type"
     messages.append({"from": "VoteBot", "text": (
-        "What type of question?\n\n"
-        "1. Single Choice\n"
-        "2. Multiple Choice\n"
-        "3. Rating (0-100 scale)\n"
-        "4. Free Text"
+        "✓\n\n<strong>What type of question?</strong>\n\n"
+        "1️⃣ Single Choice\n"
+        "2️⃣ Multiple Choice\n"
+        "3️⃣ Rating (0-100 scale)\n"
+        "4️⃣ Free Text"
     )})
     return jsonify(messages=messages)
 
@@ -66,10 +66,10 @@ def handle_quick_type(text, state, messages):
     # Branch based on question type
     if state["temp"]["qtype"] in ["ChoiceSingle", "ChoiceMulti"]:
         state["step"] = "ask_options"
-        messages.append({"from": "VoteBot", "text": "Enter options separated by commas (e.g. red,blue,green)."})
+        messages.append({"from": "VoteBot", "text": "✓\n\n📑 <strong>Enter options</strong> (separated by commas)\nExample: red,blue,green"})
     elif state["temp"]["qtype"] == "RangeSlider":
         state["step"] = "ask_rating_min"
-        messages.append({"from": "VoteBot", "text": "Minimum rating value? (e.g., 0)"})
+        messages.append({"from": "VoteBot", "text": "✓\n\n📊 <strong>Minimum rating value?</strong>\nExample: 0"})
     elif state["temp"]["qtype"] == "TextQuestion":
         # TextQuestion has no config, go straight to preview
         state["step"] = "confirm_overview"
@@ -78,7 +78,7 @@ def handle_quick_type(text, state, messages):
         email = state["temp"]["email"]
         
         overview = (
-            "Here is your survey overview:\n\n"
+            "📋 <strong>Survey Overview</strong>\n\n"
             f"<strong>Creator Email:</strong> {email}\n"
             f"<strong>Title:</strong> {title}\n"
             f"<strong>Question:</strong> {question}\n"
@@ -111,7 +111,7 @@ def handle_quick_rating_max(text, state, messages):
         min_val = state["temp"]["rating_min"]
         
         if max_val <= min_val:
-            messages.append({"from": "VoteBot", "text": f"Maximum must be greater than minimum ({min_val})."})
+            messages.append({"from": "VoteBot", "text": f"⚠️ Maximum must be greater than minimum ({min_val})."})
             return jsonify(messages=messages)
         
         state["temp"]["rating_max"] = max_val
@@ -123,7 +123,7 @@ def handle_quick_rating_max(text, state, messages):
         email = state["temp"]["email"]
         
         overview = (
-            "Here is your survey overview:\n\n"
+            "📋 <strong>Survey Overview</strong>\n\n"
             f"<strong>Creator Email:</strong> {email}\n"
             f"<strong>Title:</strong> {title}\n"
             f"<strong>Question:</strong> {question}\n"
@@ -152,7 +152,7 @@ def handle_quick_options(text, state, messages):
     options_text = "\n".join([f"- {o}" for o in opts])
 
     overview = (
-        "Here is your survey overview:\n\n"
+        "📋 <strong>Survey Overview</strong>\n\n"
         f"<strong>Creator Email:</strong> {email}\n"
         f"<strong>Title:</strong> {title}\n"
         f"<strong>Question:</strong> {question}\n"
@@ -190,8 +190,8 @@ def handle_quick_confirmation(text, state, messages, room, ROOMS):
         state["step"] = "main"  # Reset to main menu
 
         messages.append({"from": "VoteBot", "text": (
-            f"<strong>Survey created!</strong>\n\n"
-            f"<strong>Survey Code:</strong> {enter_code}\n\n"
+            f"✅ <strong>Survey created successfully!</strong>\n\n"
+            f"📋 <strong>Survey Code:</strong> {enter_code}\n\n"
             "Type <strong>create</strong> to make another survey, "
             "<strong>vote {enter_code}</strong> to participate, or "
             "<strong>result {enter_code}</strong> to see results."

@@ -322,9 +322,9 @@ def api_message():
             ROOMS[room]["vote_answer"] = {}
 
             if 200 <= resp.status_code < 300:
-                messages.append({"from": "VoteBot", "text": "All questions answered and submitted. Thank you!"})
+                messages.append({"from": "VoteBot", "text": "✅ All questions answered and submitted. Thank you!"})
             else:
-                messages.append({"from": "VoteBot", "text": f"Failed to submit answers: {resp.status_code} {resp.text}"})
+                messages.append({"from": "VoteBot", "text": f"⚠️ Failed to submit answers: {resp.status_code} {resp.text}"})
             return jsonify(messages=messages)
 
         # load next question
@@ -461,17 +461,17 @@ def api_message():
                 f"• <strong>{s['title']}</strong> (Code: {s['enter_code']})"
                 for s in available_surveys
             ])
-            messages.append({"from": "VoteBot", "text": f"<strong>Available Surveys:</strong>\n\n{survey_list}\n\nUse 'vote <code>' to participate."})
+            messages.append({"from": "VoteBot", "text": f"📋 <strong>Available Surveys:</strong>\n\n{survey_list}\n\nUse 'vote <code>' to participate."})
         return jsonify(messages=messages)
 
     # === CREATE SURVEY FLOW ===
     if command == "create":
         ROOMS[room]["pending_create"] = {"step": "ask_mode", "temp": {}}
         messages.append({"from": "VoteBot", "text": (
-            "<strong>Create a New Survey</strong>\n\n"
+            "📊 <strong>Create a New Survey</strong>\n\n"
             "Choose mode:\n"
-            "1. <strong>Quick</strong> - Simple survey with one question\n"
-            "2. <strong>Advanced</strong> - Full control with blocks and multiple questions\n\n"
+            "1️⃣ <strong>Quick</strong> - Simple survey with one question\n"
+            "2️⃣ <strong>Advanced</strong> - Full control with blocks and multiple questions\n\n"
             "Reply with 1 or 2"
         )})
         return jsonify(messages=messages)
