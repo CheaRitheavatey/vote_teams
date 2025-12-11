@@ -358,13 +358,15 @@ def api_message():
         header_q = f"Question {q_index} ({q_index}/{total_questions}): {question_text} ({q_type})<br>"
         
         if q_type == "RangeSlider":
-            c = data["config"]["range_config"]
+            c = data.get("config", {}).get("range_config", {}) or {}
+            min_val = c.get("min", 0)
+            max_val = c.get("max", 100)
             messages.append({
                 "from": "VoteBot",
                 "text": (
                     f"{header_block}"
                     f"{header_q}"
-                    f"Range: {c['min']}–{c['max']}<br><br>"
+                    f"Range: {min_val}–{max_val}<br><br>"
                     "Enter number:")
             })
         elif q_type == "TextQuestion":
