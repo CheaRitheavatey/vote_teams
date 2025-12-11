@@ -17,10 +17,10 @@ def handle_block_selection(text, state, messages):
         state["step"] = "select_question_type"
         messages.append({"from": "VoteBot", "text": (
             "<strong>Adding standalone questions</strong>\n\n"
-            "What type of question?\n\n"
-            "1. Single Choice\n"
-            "2. Multiple Choice\n"
-            "3. Rating (0-100 scale)"
+            "<strong>What type of question?</strong>\n\n"
+            "1️⃣ Single Choice\n"
+            "2️⃣ Multiple Choice\n"
+            "3️⃣ Rating (0-100 scale)"
         )})
     else:
         messages.append({"from": "VoteBot", "text": "Please reply 'yes' or 'no'"})
@@ -46,11 +46,11 @@ def handle_block_description(text, state, messages):
     messages.append({"from": "VoteBot", "text": (
         f"<strong>Current Block: {block_title}</strong>\n"
         "Ready to add questions!\n\n"
-        "What type of question?\n\n"
-        "1. Single Choice\n"
-        "2. Multiple Choice\n"
-        "3. Rating (0-100 scale)\n"
-        "4. Free Text"
+        "<strong>What type of question?</strong>\n\n"
+        "1️⃣ Single Choice\n"
+        "2️⃣ Multiple Choice\n"
+        "3️⃣ Rating (0-100 scale)\n"
+        "4️⃣ Free Text"
     )})
     return jsonify(messages=messages)
 
@@ -67,9 +67,9 @@ def handle_question_type(text, state, messages):
     if text.strip() in q_type_map:
         state["temp"]["current_question"] = {"type": q_type_map[text.strip()]}
         state["step"] = "question_text"
-        messages.append({"from": "VoteBot", "text": "<strong>Your question?</strong>"})
+        messages.append({"from": "VoteBot", "text": "❓ <strong>Your question?</strong>"})
     else:
-        messages.append({"from": "VoteBot", "text": "Please select a valid option (1-4)"})
+        messages.append({"from": "VoteBot", "text": "⚠️ Please select a valid option (1-4)"})
     return jsonify(messages=messages)
 
 
@@ -82,10 +82,10 @@ def handle_question_text(text, state, messages):
     if q_type in ["ChoiceSingle", "ChoiceMulti"]:
         state["temp"]["current_question"]["options"] = []
         state["step"] = "question_options"
-        messages.append({"from": "VoteBot", "text": "<strong>Add options</strong>\nEnter options one per message. Type 'done' when finished."})
+        messages.append({"from": "VoteBot", "text": "📑 <strong>Add options</strong>\nEnter options one per message. Type 'done' when finished."})
     elif q_type == "RangeSlider":
         state["step"] = "rating_min"
-        messages.append({"from": "VoteBot", "text": "<strong>Minimum rating value?</strong> (e.g., 0)"})
+        messages.append({"from": "VoteBot", "text": "📊 <strong>Minimum rating value?</strong>\nExample: 0"})
     elif q_type == "TextQuestion":
         # TextQuestion has no additional config needed
         state["step"] = "question_confirm"

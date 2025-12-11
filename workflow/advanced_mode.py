@@ -8,7 +8,7 @@ from flask import jsonify
 def handle_advanced_mode_selection(state, messages):
     """Handle mode selection step"""
     state["step"] = "ask_email"
-    messages.append({"from": "VoteBot", "text": "Let's create your survey!\n\n<strong>Your email?</strong>"})
+    messages.append({"from": "VoteBot", "text": "Let's create your survey!\n\n📧 <strong>Your email?</strong>"})
     return jsonify(messages=messages)
 
 
@@ -16,14 +16,14 @@ def handle_advanced_email(text, state, messages, validator):
     """Handle email input for advanced mode"""
     email_pattern = r'^[a-zA-Z0-9._%+-]+@telekom\.(com|de)$'
     if not re.fullmatch(email_pattern, text.strip()):
-        messages.append({"from": "VoteBot", "text": "Please enter a valid email address. Only @telekom.com or @telekom.de domains are allowed."})
+        messages.append({"from": "VoteBot", "text": "⚠️ Please enter a valid email address. Only @telekom.com or @telekom.de domains are allowed."})
         return jsonify(messages=messages)
     
     state["temp"]["email"] = text.strip()
     
     # Branch to advanced mode
     state["step"] = "advanced_title"
-    messages.append({"from": "VoteBot", "text": "Great! Let's configure your survey.\n\n<strong>Survey title?</strong>"})
+    messages.append({"from": "VoteBot", "text": "Great! ✓\n\nLet's configure your survey.\n\n📝 <strong>Survey title?</strong>"})
     return jsonify(messages=messages)
 
 
@@ -40,7 +40,7 @@ def handle_advanced_description(text, state, messages):
     if text.lower() != "skip":
         state["temp"]["description"] = text
     state["step"] = "advanced_language"
-    messages.append({"from": "VoteBot", "text": "<strong>Language?</strong>\n1. English\n2. German\n3. Both"})
+    messages.append({"from": "VoteBot", "text": "🌍 <strong>Language?</strong>\n1. English\n2. German\n3. Both"})
     return jsonify(messages=messages)
 
 
