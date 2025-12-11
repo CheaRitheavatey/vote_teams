@@ -13,7 +13,6 @@ headers = {
 }
 
 def fetch_vote_structure(enter_code):
-    """Return the question_blocks dict for a survey code."""
     resp = requests.get(f"{BASE_URL}/vote/{enter_code}", headers=headers)
     print("GET /vote status:", resp.status_code)
     if resp.status_code != 200:
@@ -51,7 +50,6 @@ def get_next_question(blocks, current_block, current_question):
     return None, None
 
 def ask_for_answer(question: dict):
-    """Ask user in terminal and return a list of answer objects."""
     q_text = question.get("question", {}).get("DE") or question.get("question", {}).get("EN") or ""
     q_type = question.get("question_type") or question.get("questionType")
     config = question.get("config", {})
@@ -80,7 +78,7 @@ def ask_for_answer(question: dict):
                     if idx < 0 or idx >= len(options):
                         print("Index out of range.")
                         continue
-                    return [{"answer": str(idx), "condanswer": "string"}]
+                    return [{"answer": {"value": str(i)}, "condanswer": {}} for i in idxs]
             except ValueError:
                 print("Please enter valid integer indices.")
 
@@ -90,7 +88,7 @@ def ask_for_answer(question: dict):
             raw = input("Enter numeric value: ").strip()
             try:
                 num = float(raw)
-                return [{"answer": str(num), "condanswer": "string"}]
+                return [{"answer": {"value": str(num)}, "condanswer": {}}]
             except ValueError:
                 print("Enter a valid number.")
 
@@ -105,10 +103,6 @@ def ask_for_answer(question: dict):
         return None
 
 def build_full_answer_payload(blocks, answers_dict):
-    """
-    Build the final payload for POST /api/v1/answers/{enter_code}.
-    answers_dict: {(block_id, question_id): [ {answer:.., condanswer:..}, ... ]}
-    """
     payload_blocks = {}
 
     for (block_id, q_id), ans_list in answers_dict.items():
@@ -117,15 +111,9 @@ def build_full_answer_payload(blocks, answers_dict):
 
         if b_id not in payload_blocks:
             payload_blocks[b_id] = {"questions": {}}
-
+            
         payload_blocks[b_id]["questions"][qid] = {
-            "answers": [
-                {
-                    "0": {
-                        "0": ans_list
-                    }
-                }
-            ],
+            "answers": ans_list,
             "lang": "DE",
             "skip": False
         }
@@ -143,6 +131,7 @@ def submit_all_answers(enter_code, payload):
     return resp
 
 def interactive_full_vote():
+
     enter_code = input("Enter survey code: ").strip()
 
     blocks = fetch_vote_structure(enter_code)

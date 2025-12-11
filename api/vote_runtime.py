@@ -76,13 +76,13 @@ def build_full_answer_payload(blocks, answers_dict, question_types=None):
         payload_blocks[b_id]["questions"][qid] = {
             "answers": [
                 {
-                    "0": {
-                        "0": ans_list
+                    "0": {     
+                        "0": ans_list 
                     }
                 }
             ],
             "lang": "DE",
-            "skip": False
+            "skip": False,
         }
     return {"blocks": payload_blocks}
 
@@ -101,23 +101,3 @@ def submit_all_answers(enter_code, payload):
     print(f"Response status: {resp.status_code}")
     print(f"Response body: {resp.text}")
     return resp
-
-
-
-# add another helper to help with label to display the question type
-def question_type_label(q):
-    qtype = q.get("type", "").upper()
-    
-    if qtype in ("TEXT", "STRING", "INPUT"):
-        return "Text Question"
-
-    if qtype in ("SINGLECHOICE", "SELECTONE", "RADIO"):
-        return "Single Choice"
-
-    if qtype in ("MULTICHOICE", "SELECTMULTI", "CHECKBOX"):
-        return "Multiple Choice"
-
-    if qtype in ("RANGE", "SLIDER"):
-        return "Range / Slider"
-
-    return f"{qtype}"
