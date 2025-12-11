@@ -96,10 +96,14 @@ def create_survey_interactive():
                         "0": {
                             "question": {"DE": question_text},
                             "question_type": question_type,
-                            "settings": {"mandatory": True, "grid": False},
+                            "settings": {
+                                "mandatory": True,
+                                "grid": False
+                            },
                             "config": {
                                 "option_type": "TEXT",
-                                "options": options
+                                "options": options,
+                                **({"min_selectable": 1, "max_selectable": len(options)} if question_type == "ChoiceMulti" else {})
                             },
                             "analysis_mode": "FREE"
                         }
@@ -135,11 +139,16 @@ def create_survey(title, question_text, question_type, options_or_config, creato
             "option_type": "TEXT",
             "options": {str(i): {"DE": opt} for i, opt in enumerate(options_or_config)}
         }
+        # Add min/max selectable for ChoiceMulti
+        if question_type == "ChoiceMulti":
+            question_config["min_selectable"] = 1  # At least 1 answer
+            question_config["max_selectable"] = len(options_or_config)  # Up to all options
     elif question_type == "RangeSlider":
         min_val = options_or_config.get("min", 0)
         max_val = options_or_config.get("max", 100)
         question_config = {
             "range_config": {
+                "range_type": "VALUE",  # Important: VALUE, DATE, DATETIME, TIME, or FIBONACCI (uppercase)
                 "min": min_val,
                 "max": max_val,
                 "start": str(min_val),
@@ -156,6 +165,7 @@ def create_survey(title, question_text, question_type, options_or_config, creato
                 "title": {"DE": title},
                 "creator": creator_email,
                 "public": True,
+                "state": "PUBLISHED",
                 "settings": {
                     "editable_answer": True,
                     "full_participation": True,
@@ -174,7 +184,10 @@ def create_survey(title, question_text, question_type, options_or_config, creato
                         "0": {
                             "question": {"DE": question_text},
                             "question_type": question_type,
-                            "settings": {"mandatory": True, "grid": False},
+                            "settings": {
+                                "mandatory": False,
+                                "grid": False
+                            },
                             "config": question_config,
                             "analysis_mode": "FREE"
                         }

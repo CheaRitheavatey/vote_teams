@@ -31,7 +31,10 @@ def create_advanced_survey(state_temp):
             question_obj = {
                 "question": {"DE": q["question"]},
                 "question_type": q["type"],
-                "settings": {"mandatory": False, "grid": False},
+                "settings": {
+                    "mandatory": False,
+                    "grid": False
+                },
                 "config": {},
                 "analysis_mode": "FREE"
             }
@@ -43,10 +46,15 @@ def create_advanced_survey(state_temp):
                     options_dict[str(opt_idx)] = {"DE": opt}
                 question_obj["config"]["option_type"] = "TEXT"
                 question_obj["config"]["options"] = options_dict
+                # Add min/max selectable for ChoiceMulti
+                if q["type"] == "ChoiceMulti":
+                    question_obj["config"]["min_selectable"] = 1
+                    question_obj["config"]["max_selectable"] = len(q["options"])
             elif q["type"] == "RangeSlider":
                 min_val = q.get("rating_min", 0)
                 max_val = q.get("rating_max", 100)
                 question_obj["config"]["range_config"] = {
+                    "range_type": "VALUE",
                     "min": min_val,
                     "max": max_val,
                     "start": str(min_val),
@@ -93,7 +101,10 @@ def create_advanced_survey(state_temp):
             question_obj = {
                 "question": {"DE": q["question"]},
                 "question_type": q["type"],
-                "settings": {"mandatory": False, "grid": False},
+                "settings": {
+                    "mandatory": False,
+                    "grid": False
+                },
                 "config": {},
                 "analysis_mode": "FREE"
             }
@@ -105,10 +116,15 @@ def create_advanced_survey(state_temp):
                     options_dict[str(opt_idx)] = {"DE": opt}
                 question_obj["config"]["option_type"] = "TEXT"
                 question_obj["config"]["options"] = options_dict
+                # Add min/max selectable for ChoiceMulti
+                if q["type"] == "ChoiceMulti":
+                    question_obj["config"]["min_selectable"] = 1
+                    question_obj["config"]["max_selectable"] = len(q["options"])
             elif q["type"] == "RangeSlider":
                 min_val = q.get("rating_min", 0)
                 max_val = q.get("rating_max", 100)
                 question_obj["config"]["range_config"] = {
+                    "range_type": "VALUE",
                     "min": min_val,
                     "max": max_val,
                     "start": str(min_val),
@@ -118,7 +134,7 @@ def create_advanced_survey(state_temp):
             
             questions_dict[str(q_idx)] = question_obj
         
-        # Build structure for standalone questions - link in sequence
+        # Build the structure
         num_questions = len(state_temp["standalone_questions"])
         components = {}
         for i in range(num_questions):

@@ -54,7 +54,8 @@ ROOMS = {
         "pending_confirmation": None,
         "pending_vote_for_code": None,
         "vote_block": None, # fetch the vote structure
-        "vote_answer": {} # store answer first before send to endpoint
+        "vote_answer": {}, # store answer first before send to endpoint
+        "question_types": {}  # track question types {(block, question): "Type"}
     }
 }
     # function to build answer
@@ -101,7 +102,8 @@ def api_message():
             "pending_confirmation": None,
             "pending_vote_for_code": None,
             "vote_block": None,
-            "vote_answer": {}
+            "vote_answer": {},
+            "question_types": {}
         }
 
     state = ROOMS[room].get("pending_create")
@@ -173,6 +175,9 @@ def api_message():
                 "question": current_question,
                 "type": question_type
             }
+            
+            # Track question type for answer formatting
+            ROOMS[room]["question_types"][(current_block, current_question)] = question_type
 
             # 6 display first question
             total_questions = len(blocks[current_block]["questions"])
@@ -206,12 +211,18 @@ def api_message():
                 options = [v["DE"] for _, v in data["config"]["options"].items()]
                 options_text = "<br>".join([f"{i}. {opt}" for i, opt in enumerate(options)])
 
+                # Different prompt for ChoiceMulti
+                if question_type == "ChoiceMulti":
+                    choice_prompt = "Enter your choices (e.g., '0,2' or '0 2'):"
+                else:
+                    choice_prompt = "Enter your choice number:"
+
                 messages.append({
                     "from": "VoteBot",
                     "text": (
                         f"{header_text}{question_text} ({question_type})<br>"
                         f"Options: <br>{options_text}<br><br>"
-                        "Enter your choice number:"
+                        f"{choice_prompt}"
                     )
                 })
 
@@ -286,14 +297,28 @@ def api_message():
 
         # get structure + current answers
         blocks = ROOMS[room].get("vote_block") or fetch_vote_structure(code)
-        # ROOMS[room]["vote_block"] = blocks
+        ROOMS[room]["vote_block"] = blocks  # Store for later use
         answers_dict = ROOMS[room].get("vote_answers", {})
 
         # parse this answer
         try:
             if q_type == "TextQuestion":
                 ans_list = [{"answer": text, "condanswer": "string"}]
+            elif q_type == "RangeSlider":
+                # For RangeSlider, parse as float but convert to int for submission
+                value = float(text)
+                ans_list = [{"answer": str(int(value)), "condanswer": "string"}]
+            elif q_type == "ChoiceMulti":
+                # For ChoiceMulti, accept comma-separated or space-separated numbers
+                # e.g., "1,3,5" or "1 3 5"
+                text_clean = text.replace(',', ' ')
+                choices = [int(x.strip()) for x in text_clean.split() if x.strip().isdigit()]
+                if not choices:
+                    raise ValueError("No valid choices")
+                # Submit multiple answers for multi-choice
+                ans_list = [{"answer": str(c), "condanswer": "string"} for c in choices]
             else:
+                # For ChoiceSingle, parse as int
                 value = int(text)
                 ans_list = [{"answer": str(value), "condanswer": "string"}]
         except ValueError:
@@ -309,7 +334,8 @@ def api_message():
 
         if next_block is None:
             # no more questions -> send all at once
-            payload = build_full_answer_payload(blocks, answers_dict)
+            question_types = ROOMS[room].get("question_types", {})
+            payload = build_full_answer_payload(blocks, answers_dict, question_types)
             resp = submit_all_answers(code,payload)
             # resp = requests.post(
             #     f"{BASE_URL}/answers/{code}",
@@ -320,6 +346,7 @@ def api_message():
             ROOMS[room]["pending_confirmation"] = None
             ROOMS[room]["vote_block"] = None
             ROOMS[room]["vote_answer"] = {}
+            ROOMS[room]["question_types"] = {}  # Clear question types
 
             if 200 <= resp.status_code < 300:
                 messages.append({"from": "VoteBot", "text": "✅ All questions answered and submitted. Thank you!"})
@@ -341,6 +368,9 @@ def api_message():
             "question": next_q,
             "type": q_type
         }
+        
+        # Track question type
+        ROOMS[room]["question_types"][(next_block, next_q)] = q_type
 
         question_text = data["question"]["DE"]
         
@@ -378,6 +408,13 @@ def api_message():
             options = data["config"]["options"]
             text_opts = "<br>".join([f"{i}. {opt['DE']}" for i, opt in options.items()])
             options_html = "<br>".join(text_opts)
+            
+            # Different prompt for ChoiceMulti
+            if q_type == "ChoiceMulti":
+                choice_prompt = "Enter your choices (e.g., '0,2' or '0 2'):"
+            else:
+                choice_prompt = "Enter your choice:"
+            
             messages.append({
                 "from": "VoteBot",
                 "text":
@@ -386,7 +423,7 @@ def api_message():
                     f"{header_q}"
                     "Options:<br>"
                     f"{options_html}<br><br>"
-                    "Enter your choice:"
+                    f"{choice_prompt}"
                 )
             })
 

@@ -24,6 +24,15 @@ def fetch_vote_structure(enter_code):
     data = resp.json().get("data", {})
     # system uses "question_blocks"
     blocks = data.get("question_blocks", {})
+    
+    # DEBUG: Print structure to see what fields exist
+    print("\n=== DEBUG: Blocks structure ===")
+    for b_id, block in blocks.items():
+        print(f"Block {b_id}:")
+        for q_id, question in block.get("questions", {}).items():
+            print(f"  Question {q_id}: {list(question.keys())}")
+    print("==============================\n")
+    
     return blocks
 
 def get_next_question(blocks, current_block, current_question):
@@ -48,13 +57,22 @@ def get_next_question(blocks, current_block, current_question):
     return None, None
 
 
-def build_full_answer_payload(blocks, answers_dict):
+def build_full_answer_payload(blocks, answers_dict, question_types=None):
+    """
+    Build payload for submitting answers.
+    
+    Args:
+        blocks: Vote structure from fetch_vote_structure
+        answers_dict: {(block_id, q_id): [answer_list]}
+        question_types: Optional dict {(block_id, q_id): "QuestionType"} for formatting
+    """
     payload_blocks = {}
     for (block_id, q_id), ans_list in answers_dict.items():
         b_id = str(block_id)
         qid = str(q_id)
         if b_id not in payload_blocks:
             payload_blocks[b_id] = {"questions": {}}
+        
         payload_blocks[b_id]["questions"][qid] = {
             "answers": [
                 {
@@ -70,11 +88,18 @@ def build_full_answer_payload(blocks, answers_dict):
 
 
 def submit_all_answers(enter_code, payload):
+    print("\n=== DEBUG: Submitting payload ===")
+    import json
+    print(json.dumps(payload, indent=2))
+    print("=================================\n")
+    
     resp = requests.post(
         f"{BASE_URL}/answers/{enter_code}",
         headers=headers,
         json=payload
     )
+    print(f"Response status: {resp.status_code}")
+    print(f"Response body: {resp.text}")
     return resp
 
 
