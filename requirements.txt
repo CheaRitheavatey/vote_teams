@@ -1,4 +1,11 @@
-requests
-python-dotenv
-flask
-flask-cors
+# Vote@Teams Dependencies
+
+# Web Framework
+Flask>=3.0.0
+flask-cors>=4.0.0
+
+# HTTP Requests
+requests>=2.31.0
+
+# Environment Configuration
+python-dotenv>=1.0.0

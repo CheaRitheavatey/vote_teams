@@ -1,13 +1,37 @@
+# Environment variables
 .env*
-__pycache__\.idea/
-.vscode/
+
+# Python cache
 __pycache__/
-dist/
+*.py[cod]
+*$py.class
+*.so
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Testing
 .coverage*
 htmlcov/
 .tox/
-docs/_build/
-.gitignore
+.pytest_cache/
 
-architecture.md
-refactoring_notes.md
+# Build
+dist/
+build/
+*.egg-info/
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Archive folder (development artifacts)
+archive/
+
+# OS files
+.DS_Store
+Thumbs.db
