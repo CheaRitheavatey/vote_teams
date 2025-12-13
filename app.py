@@ -408,8 +408,8 @@ def api_message():
                         })
         else:
             options = data["config"]["options"]
-            text_opts = "<br>".join([f"{i}. {opt['DE']}" for i, opt in options.items()])
-            options_html = "<br>".join(text_opts)
+            text_opts = "\n".join([f"{i}. {opt['DE']}" for i, opt in options.items()])
+            options_html = "".join(text_opts)
             
             # Different prompt for ChoiceMulti
             if q_type == "ChoiceMulti":
